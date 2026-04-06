@@ -149,19 +149,15 @@ export default async function StatePage({
 
       <SectionCard title={`${summary.state} compliance records overview`}>
         <p>
-          This page provides access to public compliance records for companies and contractors in {summary.state}.
+          This database aggregates publicly available records from OSHA, state contractor licensing boards, and official business registration systems.
+          It is designed to help users perform preliminary compliance checks before hiring or working with a company.
         </p>
         <p>
-          Users can search contractor license status, review OSHA inspection records, and verify business registration details
+          This page helps users search contractor licenses, review OSHA inspection history, and verify business registration records in {summary.state}.
+        </p>
+        <p>
+          Users can look up whether a company has active licenses, workplace safety violations, or valid registration status
           using official government data sources.
-        </p>
-        <p>
-          The {summary.state} contractor license lookup and OSHA records database help users check whether a company has active
-          licenses, workplace safety violations, or valid registration status.
-        </p>
-        <p>
-          Search terms covered on this page include OSHA violations {summary.state}, check contractor license {summary.state},
-          company safety record {summary.state}, and verify business license {summary.state}.
         </p>
       </SectionCard>
 
@@ -193,11 +189,40 @@ export default async function StatePage({
         <p>Total companies indexed: {summary.company_count}</p>
         <p>OSHA inspection records: {summary.osha_count}</p>
         <p>Contractor license records: {summary.license_count > 0 ? 'Available' : 'Not available in current dataset'}</p>
-        <p>Business registration records: {summary.registration_count > 0 ? 'Available' : 'Not available in current dataset'}</p>
+        <p>Business registration records: {summary.registration_count > 0 ? 'Available' : 'Not currently available in this dataset and may vary by source availability'}</p>
         <p>
           The large number of OSHA inspection records in {summary.state} reflects extensive workplace safety reporting across industries.
           Users can use this data to identify companies with inspection history, verify licensing status, and better understand compliance patterns within the state.
         </p>
+      </SectionCard>
+
+      <SectionCard title={`How to check a contractor license in ${summary.state}`}>
+        <ol>
+          <li>Enter the company name in the search box on this page</li>
+          <li>Select {summary.state} as the state</li>
+          <li>Review license status, OSHA records, and registration details</li>
+          <li>Verify the company&apos;s compliance status with official {summary.state} state authorities if needed</li>
+        </ol>
+      </SectionCard>
+
+      <SectionCard title="Why checking company compliance matters">
+        <p>
+          Verifying a company&apos;s license status and safety history helps reduce risk when hiring contractors,
+          especially for construction, repairs, and other regulated industries.
+        </p>
+        <p>
+          Checking OSHA inspection records and contractor licenses provides preliminary compliance information
+          that can inform hiring and business decisions.
+        </p>
+      </SectionCard>
+
+      <SectionCard title="Who uses this page">
+        <ul>
+          <li>Homeowners hiring contractors for renovations or repairs</li>
+          <li>Businesses verifying vendors and subcontractors</li>
+          <li>Job seekers reviewing employer safety records</li>
+          <li>General users researching company compliance history</li>
+        </ul>
       </SectionCard>
 
       <SectionCard title="State filters">
@@ -324,9 +349,12 @@ export default async function StatePage({
       </SectionCard>
 
       <SectionCard title="FAQ">
-        <p><strong>Do you cover all companies in this state?</strong><br />Coverage is expanding and depends on available public records.</p>
-        <p><strong>How often is this state updated?</strong><br />On periodic refresh schedules by data category.</p>
-        <p><strong>Can I check contractor license California and OSHA violations California on this page?</strong><br />Yes. This page helps users check contractor license California records, OSHA violations California coverage, company safety record California results, and verify business license California references from public datasets.</p>
+        <p><strong>Do you cover all companies in {summary.state}?</strong><br />Coverage is expanding and depends on available public records from official sources.</p>
+        <p><strong>How often is this {summary.state} compliance data updated?</strong><br />Data is refreshed on periodic cycles based on source availability from OSHA, state licensing boards, and business registration systems.</p>
+        <p><strong>How do I check a contractor license in {summary.state}?</strong><br />Use the search box to enter a company name, then review the contractor license status listed in the results.</p>
+        <p><strong>What does OSHA inspection history mean?</strong><br />OSHA inspections reflect workplace safety reviews conducted by federal authorities. A history of inspections may indicate operational activity or prior safety incidents.</p>
+        <p><strong>Can this data help me make hiring decisions?</strong><br />Yes, this database helps with preliminary compliance screening. However, you should always verify current license and registration status directly with official {summary.state} state agencies.</p>
+        <p><strong>Are these records official?</strong><br />All data is sourced from official public government agencies including OSHA, state contractor licensing boards, and Secretary of State records.</p>
       </SectionCard>
     </main>
   );
