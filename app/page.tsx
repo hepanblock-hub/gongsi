@@ -20,7 +20,12 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const rows = await getRecentCompanyPages(30);
+  let rows = [] as Awaited<ReturnType<typeof getRecentCompanyPages>>;
+  try {
+    rows = await getRecentCompanyPages(30);
+  } catch {
+    rows = [];
+  }
   const popularStates = ['california'];
   const stateSeoText: Record<string, string> = {
     california: 'California contractor license and OSHA records lookup',
