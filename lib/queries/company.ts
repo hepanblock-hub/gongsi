@@ -20,6 +20,28 @@ function normalizeStateInput(value: string): { slug: string; name: string; code:
   return { slug, name, code };
 }
 
+function sanitizeCity(value: string | null): string | null {
+  if (!value) return null;
+  const withoutStateSuffix = value
+    .trim()
+    .replace(/,\s*(ca|california)\b.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!withoutStateSuffix) return null;
+
+  const isAddressLike =
+    /^\d+\b/.test(withoutStateSuffix) ||
+    /\b(st|street|ave|avenue|blvd|boulevard|road|rd|drive|dr|suite|ste|apt|unit|hwy|highway)\b/i.test(withoutStateSuffix) ||
+    withoutStateSuffix.length > 40;
+
+  if (isAddressLike || /^(-\s*select\s*-|select|unknown|n\/?a)$/i.test(withoutStateSuffix)) {
+    return null;
+  }
+
+  return withoutStateSuffix.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export async function getRecentCompanyPages(limit = 30): Promise<RecentCompanyRow[]> {
   const { rows } = await pool.query<RecentCompanyRow>(
     `SELECT
@@ -48,11 +70,12 @@ export async function getRecentCompanyPages(limit = 30): Promise<RecentCompanyRo
           ) AS has_registration
         FROM company_pages cp
      WHERE cp.company_name ~* '[A-Za-z]'
+       AND lower(trim(cp.company_name)) <> '- select -'
      ORDER BY cp.id DESC
      LIMIT $1`,
     [limit]
   );
-  return rows;
+  return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
 }
 
 export async function getCompanyBySlug(slug: string): Promise<CompanyPageRow | null> {
@@ -61,10 +84,12 @@ export async function getCompanyBySlug(slug: string): Promise<CompanyPageRow | n
      FROM company_pages
      WHERE slug = $1
        AND company_name ~* '[A-Za-z]'
+       AND lower(trim(company_name)) <> '- select -'
      LIMIT 1`,
     [slug]
   );
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  return row ? { ...row, city: sanitizeCity(row.city) } : null;
 }
 
 export async function searchCompanies(options: SearchOptions): Promise<SearchCompanyRow[]> {
@@ -137,13 +162,14 @@ export async function searchCompanies(options: SearchOptions): Promise<SearchCom
         ), 'unknown') AS registration_status
      FROM company_pages cp
      WHERE cp.company_name ~* '[A-Za-z]'
+       AND lower(trim(cp.company_name)) <> '- select -'
        AND ${where.join(' AND ')}
      ORDER BY ${orderBy}
      LIMIT 100`,
     params
   );
 
-  return rows;
+  return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
 }
 
 export async function getCompanyTimeline(companyName: string, state: string, limit = 30): Promise<CompanyTimelineRow[]> {
@@ -207,6 +233,7 @@ export async function getRelatedCompanies(companyName: string, state: string, ci
      FROM company_pages
      WHERE lower(state) = lower($1)
        AND company_name ~* '[A-Za-z]'
+       AND lower(trim(company_name)) <> '- select -'
        AND ($5::text IS NULL OR slug <> $5)
        AND (
          $3::text IS NULL
@@ -218,5 +245,25 @@ export async function getRelatedCompanies(companyName: string, state: string, ci
     [state, companyName, city ?? null, limit, currentSlug ?? null]
   );
 
-  return rows;
+  return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
+}
+
+export async function getCompanyDetailedLocation(companyName: string, state: string): Promise<string | null> {
+  const { rows } = await pool.query<{ detailed_location: string | null }>(
+    `SELECT trim(oi.city) AS detailed_location
+     FROM osha_inspections oi
+     WHERE oi.normalized_name = normalize_company_name($1)
+       AND lower(oi.state) = lower($2)
+       AND trim(coalesce(oi.city, '')) <> ''
+       AND (
+         oi.city ~ '^\\s*\\d+'
+         OR oi.city ~* '\\b(st|street|ave|avenue|blvd|boulevard|road|rd|drive|dr|suite|ste|apt|unit|hwy|highway)\\b'
+         OR oi.city LIKE '%,%'
+       )
+     ORDER BY oi.inspection_date DESC NULLS LAST
+     LIMIT 1`,
+    [companyName, state]
+  );
+
+  return rows[0]?.detailed_location?.trim() || null;
 }

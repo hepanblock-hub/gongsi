@@ -32,6 +32,51 @@ export type StateCityCountRow = {
   company_count: number;
 };
 
+const MIN_INDEXED_STATE_COMPANY_COUNT = Number(process.env.MIN_INDEXED_STATE_COMPANY_COUNT ?? 50);
+
+function canonicalStateSlug(rawState: string): string | null {
+  const raw = rawState.trim();
+  if (!raw) return null;
+
+  const upper = raw.toUpperCase();
+  if (upper.length === 2 && STATE_CODE_TO_NAME[upper]) {
+    return normalizeStateSlug(STATE_CODE_TO_NAME[upper]);
+  }
+
+  const lower = raw.toLowerCase();
+  if (STATE_NAME_TO_CODE[lower]) {
+    return normalizeStateSlug(raw);
+  }
+
+  return null;
+}
+
+function normalizeCityForUi(rawCity: string): string {
+  const trimmed = rawCity.trim();
+  if (!trimmed) return 'Unknown';
+
+  const withoutStateSuffix = trimmed
+    .replace(/,\s*(ca|california)\b.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!withoutStateSuffix) return 'Unknown';
+
+  const isAddressLike =
+    /^\d+\b/.test(withoutStateSuffix) ||
+    /\b(st|street|ave|avenue|blvd|boulevard|road|rd|drive|dr|suite|ste|apt|unit|hwy|highway)\b/i.test(withoutStateSuffix) ||
+    (withoutStateSuffix.includes(',') && withoutStateSuffix.length > 18) ||
+    withoutStateSuffix.length > 40;
+
+  if (isAddressLike || /^(-\s*select\s*-|select|unknown|n\/?a)$/i.test(withoutStateSuffix)) {
+    return 'Unknown';
+  }
+
+  return withoutStateSuffix
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export async function getStateCompanyPages(stateSlug: string, limit = 200): Promise<CompanyPageRow[]> {
   const stateName = stateSlugToName(stateSlug);
   const stateCode = STATE_NAME_TO_CODE[stateName.toLowerCase()] ?? '';
@@ -39,6 +84,7 @@ export async function getStateCompanyPages(stateSlug: string, limit = 200): Prom
     `SELECT slug, company_name, state, city, updated_at::text
      FROM company_pages
      WHERE company_name ~* '[A-Za-z]'
+       AND lower(trim(company_name)) <> '- select -'
        AND (
          lower(regexp_replace(state, '\\s+', '-', 'g')) = $1
         OR lower(state) = lower($2)
@@ -110,6 +156,7 @@ export async function getStateCompanyPagesWithCategory(stateSlug: string, limit 
         ) AS license_status
      FROM company_pages cp
      WHERE cp.company_name ~* '[A-Za-z]'
+       AND lower(trim(cp.company_name)) <> '- select -'
        AND (
          lower(regexp_replace(cp.state, '\\s+', '-', 'g')) = $1
         OR lower(cp.state) = lower($2)
@@ -165,6 +212,7 @@ export async function getStateSummary(stateSlug: string): Promise<{
         ) AS registration_count
      FROM company_pages cp
      WHERE cp.company_name ~* '[A-Za-z]'
+       AND lower(trim(cp.company_name)) <> '- select -'
        AND (
          lower(regexp_replace(cp.state, '\\s+', '-', 'g')) = $1
         OR lower(cp.state) = lower($2)
@@ -200,6 +248,7 @@ export async function getStateCityCounts(stateSlug: string, limit?: number): Pro
         COUNT(*) AS company_count
      FROM company_pages cp
      WHERE cp.company_name ~* '[A-Za-z]'
+       AND lower(trim(cp.company_name)) <> '- select -'
        AND (
          lower(regexp_replace(cp.state, '\\s+', '-', 'g')) = $1
         OR lower(cp.state) = lower($2)
@@ -211,28 +260,41 @@ export async function getStateCityCounts(stateSlug: string, limit?: number): Pro
       params
   );
 
-  return rows.map((r) => ({ city: r.city, company_count: Number(r.company_count) }));
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const city = normalizeCityForUi(row.city);
+    if (city === 'Unknown') continue;
+    counts.set(city, (counts.get(city) ?? 0) + Number(row.company_count));
+  }
+
+  return Array.from(counts.entries())
+    .map(([city, company_count]) => ({ city, company_count }))
+    .sort((a, b) => b.company_count - a.company_count || a.city.localeCompare(b.city))
+    .slice(0, typeof limit === 'number' && limit > 0 ? limit : Number.MAX_SAFE_INTEGER);
 }
 
 export async function getIndexedStateSlugs(): Promise<string[]> {
-  const { rows } = await pool.query<{ state: string }>(
-    `SELECT DISTINCT trim(state) AS state
+  const { rows } = await pool.query<{ state: string; company_count: string }>(
+    `SELECT trim(state) AS state, COUNT(*)::text AS company_count
      FROM company_pages
      WHERE company_name ~* '[A-Za-z]'
-       AND trim(coalesce(state, '')) <> ''`
+       AND lower(trim(company_name)) <> '- select -'
+       AND trim(coalesce(state, '')) <> ''
+     GROUP BY 1`
   );
 
-  const slugs = new Set<string>();
+  const countsBySlug = new Map<string, number>();
   for (const row of rows) {
-    const raw = row.state.trim();
-    const upper = raw.toUpperCase();
-    const stateName = upper.length === 2
-      ? (STATE_CODE_TO_NAME[upper] ?? raw)
-      : raw;
-    slugs.add(normalizeStateSlug(stateName));
+    const slug = canonicalStateSlug(row.state);
+    if (!slug) continue;
+    const count = Number(row.company_count || 0);
+    countsBySlug.set(slug, (countsBySlug.get(slug) ?? 0) + count);
   }
 
-  return Array.from(slugs).sort();
+  return Array.from(countsBySlug.entries())
+    .filter(([, count]) => count >= MIN_INDEXED_STATE_COMPANY_COUNT)
+    .map(([slug]) => slug)
+    .sort();
 }
 
 export async function getIndexedStates(): Promise<Array<{ slug: string; name: string }>> {
@@ -241,15 +303,18 @@ export async function getIndexedStates(): Promise<Array<{ slug: string; name: st
 }
 
 export async function getIndexedStateCitiesMap(): Promise<Record<string, string[]>> {
-  const { rows } = await pool.query<{ state_slug: string; city: string }>(
+  const allowedStates = new Set(await getIndexedStateSlugs());
+
+  const { rows } = await pool.query<{ state: string; city: string }>(
     `SELECT
-        lower(regexp_replace(trim(cp.state), '\\s+', '-', 'g')) AS state_slug,
+        trim(cp.state) AS state,
         CASE
           WHEN trim(coalesce(cp.city, '')) = '' THEN 'Unknown'
-          ELSE initcap(lower(trim(cp.city)))
+          ELSE trim(cp.city)
         END AS city
      FROM company_pages cp
      WHERE cp.company_name ~* '[A-Za-z]'
+       AND lower(trim(cp.company_name)) <> '- select -'
        AND trim(coalesce(cp.state, '')) <> ''
      GROUP BY 1, 2
      ORDER BY 1, 2`
@@ -257,10 +322,22 @@ export async function getIndexedStateCitiesMap(): Promise<Record<string, string[
 
   const map: Record<string, string[]> = {};
   for (const row of rows) {
-    if (!map[row.state_slug]) {
-      map[row.state_slug] = [];
+    const stateSlug = canonicalStateSlug(row.state);
+    if (!stateSlug || !allowedStates.has(stateSlug)) continue;
+
+    const city = normalizeCityForUi(row.city);
+    if (city === 'Unknown') continue;
+
+    if (!map[stateSlug]) {
+      map[stateSlug] = [];
     }
-    map[row.state_slug].push(row.city);
+    if (!map[stateSlug].includes(city)) {
+      map[stateSlug].push(city);
+    }
+  }
+
+  for (const key of Object.keys(map)) {
+    map[key].sort((a, b) => a.localeCompare(b));
   }
 
   return map;

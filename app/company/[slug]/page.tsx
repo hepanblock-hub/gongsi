@@ -6,6 +6,7 @@ import SectionCard from '../../../components/common/SectionCard';
 import StatusBadge from '../../../components/common/StatusBadge';
 import BreadcrumbJsonLd from '../../../components/seo/BreadcrumbJsonLd';
 import {
+  getCompanyDetailedLocation,
   getCompanyBySlug,
   getCompanyTimeline,
   getLicensesByCompany,
@@ -162,6 +163,8 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
     getRelatedCompanies(page.company_name, page.state, page.city, 6, page.slug),
   ]);
 
+  const detailedLocation = await getCompanyDetailedLocation(page.company_name, page.state);
+
   const latestInspection = osha[0]?.inspection_date ?? null;
   const latestLicenseStatus = licenses[0]?.status ?? 'unknown';
   const latestRegistrationStatus = registrations[0]?.status ?? 'unknown';
@@ -199,6 +202,19 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
     : `Current records show contractor license status as ${latestLicenseStatus} and business registration status as ${latestRegistrationStatus}; users should still verify current standing through official sources.`;
 
   const riskConclusion = getRiskConclusion(osha.length);
+
+  const locationCityState = page.city
+    ? `${page.city}, ${stateName}`
+    : stateName;
+  const mapQuery = detailedLocation
+    ? `${page.company_name} ${detailedLocation}`
+    : null;
+  const mapEmbedUrl = mapQuery
+    ? `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`
+    : null;
+  const mapOpenUrl = mapQuery
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`
+    : null;
 
   const oshaFaqAnswer = osha.length > 0
     ? (() => {
@@ -252,6 +268,21 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         </p>
         <p className="muted">{freshnessLine}</p>
       </SectionCard>
+
+      {detailedLocation && mapEmbedUrl && mapOpenUrl && (
+        <SectionCard title="Location">
+          <p>This company is located in {locationCityState}.</p>
+          <p><strong>Address reference:</strong> {detailedLocation}</p>
+          <iframe
+            src={mapEmbedUrl}
+            title={`${page.company_name} map`}
+            className="location-map"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+          <p><a href={mapOpenUrl} target="_blank" rel="noopener noreferrer">View on Google Maps</a></p>
+        </SectionCard>
+      )}
 
       <section className="company-layout">
         <div className="company-main">

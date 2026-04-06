@@ -293,6 +293,13 @@ a:hover {
   gap: 8px;
 }
 
+.location-map {
+  width: 100%;
+  min-height: 320px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
 .result-badges {
   display: flex;
   gap: 8px;
