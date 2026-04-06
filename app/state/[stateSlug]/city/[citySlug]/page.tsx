@@ -55,8 +55,8 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   const stateName = stateSlugToName(stateSlug);
   const cityName = citySlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   return {
-    title: { absolute: `${cityName}, ${stateName} OSHA Violations, License & Company Records` },
-    description: `View public compliance records for companies in ${cityName}, ${stateName}, including OSHA inspections, contractor license status, and registration details.`,
+    title: { absolute: `${cityName} Contractor License Lookup, OSHA Records & Company Compliance Data` },
+    description: `Search and review public company compliance records in ${cityName}, ${stateName}. Check contractor license status, OSHA inspection history, and business registration data from official government sources.`,
     alternates: { canonical: `/state/${stateSlug}/city/${citySlug}` },
   };
 }
@@ -94,9 +94,36 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
       />
 
       <PageTitle
-        title={`${cityName}, ${stateName} company list`}
-        description="Static city page with company compliance records."
+        title={`${cityName}, ${stateName} Contractor License Lookup & OSHA Records`}
+        description={`Public compliance records and business verification for ${cityName}, ${stateName}`}
       />
+
+      <SectionCard title={`Compliance records in ${cityName}, ${stateName}`}>
+        <p>
+          This page provides access to company compliance records in {cityName}, {stateName}, including contractor license status,
+          OSHA inspection history, and business registration data where available.
+        </p>
+        <p>
+          Users can search and review public records to verify company credentials, check workplace safety history,
+          and assess compliance risk before hiring or working with a business.
+        </p>
+      </SectionCard>
+
+      <SectionCard title={`How to check a company in ${cityName}`}>
+        <ol>
+          <li>Search for the company name using the search bar on this page</li>
+          <li>Review OSHA inspection records and safety history</li>
+          <li>Check contractor license status if available</li>
+          <li>Verify business registration through official {stateName} state sources</li>
+        </ol>
+      </SectionCard>
+
+      <SectionCard title="Why checking company compliance matters">
+        <p>
+          Reviewing company compliance records helps reduce risk when hiring contractors or evaluating businesses.
+          OSHA inspection history and licensing status can provide insight into safety practices and regulatory compliance.
+        </p>
+      </SectionCard>
 
       <div id="company-list" />
       <SectionCard title="Company list">
@@ -124,18 +151,33 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
         </table>
       </SectionCard>
 
-      <SectionCard title={`${cityName} compliance analysis`}>
+      <SectionCard title={`${cityName} compliance overview`}>
         <p>
-          Within the indexed companies for {cityName}, {oshaPct}% have OSHA-linked records, {licensePct}% have license-linked records,
-          and {registrationPct}% have registration-linked records.
+          <strong>Compliance distribution for {cityName}, {stateName}</strong>
         </p>
         <p>
-          Full profiles: {fullCount} · Partial profiles: {partialCount}. This distribution can help prioritize deeper review for vendors
-          or employers with broader public compliance visibility.
+          Within the indexed companies for {cityName}, {oshaPct}% have OSHA inspection records, {licensePct}% have contractor license records,
+          and {registrationPct}% have business registration records.
         </p>
         <p>
-          City-level results are based on currently indexed public datasets and should be cross-checked with official source systems for final verification.
+          This distribution indicates that most companies in {cityName} have licensing data available, while a smaller portion have recorded workplace safety inspections.
+          Companies with full profiles provide access to all three data types, while others may have partial or limited public records available.
         </p>
+        <p>
+          Full profiles (all three records): {fullCount} · Partial profiles (any two records): {partialCount}.
+          This breakdown helps prioritize deeper review for vendors or employers with broader public compliance visibility.
+        </p>
+        <p>
+          City-level results are based on currently indexed public datasets and should be cross-checked with official {stateName} state sources for final verification.
+        </p>
+      </SectionCard>
+
+      <SectionCard title="Explore related pages">
+        <ul>
+          <li><a href={`/state/${stateSlug}`}>{stateName} contractor license lookup</a></li>
+          <li><a href={`/state/${stateSlug}`}>{stateName} OSHA inspection records</a></li>
+          <li><a href={`/state/${stateSlug}/cities`}>Browse all cities in {stateName}</a></li>
+        </ul>
       </SectionCard>
     </main>
   );
