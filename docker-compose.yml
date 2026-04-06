@@ -1,0 +1,30 @@
+services:
+  postgres_gongsihegui:
+    image: postgres:16
+    container_name: gongsihegui_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gongsi_admin
+      POSTGRES_PASSWORD: gongsi_pass_2026
+      POSTGRES_DB: gongsihegui_db
+      TZ: UTC
+    ports:
+      - "54333:5432"
+    volumes:
+      - gongsihegui_pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gongsi_admin -d gongsihegui_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gongsihegui_net
+
+volumes:
+  gongsihegui_pgdata:
+    name: gongsihegui_pgdata
+
+networks:
+  gongsihegui_net:
+    name: gongsihegui_net

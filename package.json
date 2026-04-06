@@ -1,0 +1,33 @@
+{
+  "name": "gongsihegui-site",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node --localstorage-file=.next/localstorage ./node_modules/next/dist/bin/next dev -p 39017",
+    "build": "node --localstorage-file=.next/localstorage ./node_modules/next/dist/bin/next build",
+    "start": "node --localstorage-file=.next/localstorage ./node_modules/next/dist/bin/next start -p 39017",
+    "health": "powershell -ExecutionPolicy Bypass -File D:\\gongsihegui\\scripts\\check_health.ps1",
+    "backup:db": "powershell -ExecutionPolicy Bypass -File D:\\gongsihegui\\scripts\\backup_db.ps1",
+    "pm2:autostart": "powershell -ExecutionPolicy Bypass -File D:\\gongsihegui\\scripts\\setup_pm2_autostart.ps1",
+    "ingest:ca:osha": "node D:\\gongsihegui\\scripts\\ingest_california_osha.mjs",
+    "ingest:ca:cslb": "node D:\\gongsihegui\\scripts\\ingest_california_cslb.mjs",
+    "ingest:ca:osha:local": "node D:\\gongsihegui\\scripts\\ingest_california_osha_from_csv.mjs",
+    "backfill:ca:osha:names": "node D:\\gongsihegui\\scripts\\backfill_osha_company_names.mjs",
+    "backfill:ca:osha:names:weak": "node D:\\gongsihegui\\scripts\\backfill_osha_company_names_weak.mjs",
+    "backfill:ca:osha:names:strict": "node D:\\gongsihegui\\scripts\\backfill_osha_company_names_strict.mjs",
+    "verify:ca:data": "node D:\\gongsihegui\\scripts\\verify_california_data.mjs"
+  },
+  "dependencies": {
+    "next": "15.3.2",
+    "pg": "8.13.1",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "@types/pg": "^8.20.0",
+    "@types/react": "19.0.12",
+    "@types/react-dom": "19.0.5",
+    "typescript": "5.8.3"
+  }
+}
