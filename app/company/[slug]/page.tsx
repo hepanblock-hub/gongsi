@@ -6,6 +6,7 @@ import SectionCard from '../../../components/common/SectionCard';
 import StatusBadge from '../../../components/common/StatusBadge';
 import BreadcrumbJsonLd from '../../../components/seo/BreadcrumbJsonLd';
 import {
+  getCityComplianceBenchmark,
   getCompanyDetailedLocation,
   getCompanyBySlug,
   getCompanyTimeline,
@@ -95,12 +96,111 @@ function getRiskConclusion(oshaCount: number): string {
   return 'No OSHA inspection history was found in the current public dataset.';
 }
 
+function isLikelyRealCompanyName(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  if (/^-?\s*select\s*-?$/i.test(trimmed)) return false;
+  if (/^\d+[\w\s-]*$/.test(trimmed)) return false;
+  if (/\b(st|street|ave|avenue|blvd|boulevard|road|rd|drive|dr|suite|ste|apt|unit)\b/i.test(trimmed)) return false;
+  if (/^[A-Z0-9-]{10,}$/.test(trimmed.replace(/\s+/g, ''))) return false;
+  return /[A-Za-z]/.test(trimmed);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getRiskScore(input: {
+  oshaCount: number;
+  injuryEvents: number;
+  fatalityEvents: number;
+  licenseStatus: string;
+  hasRegistration: boolean;
+  isEntityLikelyReal: boolean;
+}): { score: number; level: 'Low Risk' | 'Moderate Risk' | 'High Risk'; factors: string[] } {
+  let score = 100;
+  const factors: string[] = [];
+  const license = input.licenseStatus.toLowerCase();
+
+  if (!input.isEntityLikelyReal) {
+    score -= 18;
+    factors.push('Entity name pattern appears low-confidence and requires manual verification');
+  }
+
+  if (input.oshaCount >= 10) {
+    score -= 18;
+    factors.push(`High OSHA inspection count (${input.oshaCount})`);
+  } else if (input.oshaCount >= 3) {
+    score -= 10;
+    factors.push(`Moderate OSHA inspection activity (${input.oshaCount})`);
+  }
+
+  if (input.injuryEvents > 0) {
+    score -= 12;
+    factors.push(`Injury-linked OSHA records (${input.injuryEvents})`);
+  }
+
+  if (input.fatalityEvents > 0) {
+    score -= 20;
+    factors.push(`Fatality-linked OSHA records (${input.fatalityEvents})`);
+  }
+
+  if (license === 'active') {
+    score += 8;
+    factors.push('Active contractor license signal');
+  } else if (license === 'expired') {
+    score -= 14;
+    factors.push('Expired contractor license signal');
+  } else if (license === 'suspended' || license === 'revoked') {
+    score -= 24;
+    factors.push('Suspended or revoked license signal');
+  } else {
+    score -= 10;
+    factors.push('License status missing or unknown in current dataset');
+  }
+
+  if (!input.hasRegistration) {
+    score -= 8;
+    factors.push('Business registration status not verified in current dataset');
+  }
+
+  score = clamp(score, 1, 100);
+
+  const level = score >= 75 ? 'Low Risk' : score >= 50 ? 'Moderate Risk' : 'High Risk';
+  return { score, level, factors };
+}
+
+function getOfficialVerificationLinks(stateName: string): Array<{ label: string; url: string }> {
+  const links: Array<{ label: string; url: string }> = [
+    { label: 'OSHA Establishment Search', url: 'https://www.osha.gov/establishment-search' },
+  ];
+
+  if (stateName.toLowerCase() === 'california') {
+    links.push(
+      { label: 'California Contractor License Lookup (CSLB)', url: 'https://www2.cslb.ca.gov/OnlineServices/CheckLicenseII/CheckLicense.aspx' },
+      { label: 'California Secretary of State Business Search', url: 'https://bizfileonline.sos.ca.gov/search/business' }
+    );
+  } else {
+    links.push(
+      { label: `${stateName} Secretary of State Business Search`, url: 'https://www.nass.org/business-services' },
+      { label: `${stateName} License Verification (State Portal Index)`, url: 'https://www.nascla.org/' }
+    );
+  }
+
+  return links;
+}
+
+function toCitySlug(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const fullSlug = companyPathFromSlug(slug);
   const page = await getCompanyBySlug(fullSlug);
 
   if (!page) return { title: 'Company not found' };
+  const entityLooksReal = isLikelyRealCompanyName(page.company_name);
   const stateName = fullStateName(page.state);
   const [osha, licenses, registrations] = await Promise.all([
     getOshaByCompany(page.company_name, page.state, 1),
@@ -139,6 +239,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: { absolute: title },
     description,
+    robots: entityLooksReal ? { index: true, follow: true } : { index: false, follow: true },
     alternates: {
       canonical: page.slug,
     },
@@ -163,7 +264,10 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
     getRelatedCompanies(page.company_name, page.state, page.city, 6, page.slug),
   ]);
 
-  const detailedLocation = await getCompanyDetailedLocation(page.company_name, page.state);
+  const [detailedLocation, cityBenchmark] = await Promise.all([
+    getCompanyDetailedLocation(page.company_name, page.state),
+    getCityComplianceBenchmark(page.state, page.city),
+  ]);
 
   const latestInspection = osha[0]?.inspection_date ?? null;
   const latestLicenseStatus = licenses[0]?.status ?? 'unknown';
@@ -202,6 +306,34 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
     : `Current records show contractor license status as ${latestLicenseStatus} and business registration status as ${latestRegistrationStatus}; users should still verify current standing through official sources.`;
 
   const riskConclusion = getRiskConclusion(osha.length);
+  const entityLooksReal = isLikelyRealCompanyName(page.company_name);
+
+  const injuryEvents = osha.reduce((acc, row) => {
+    const m = row.severity?.match(/^injury_count:(\d+)$/i);
+    return acc + Number(m?.[1] ?? 0);
+  }, 0);
+
+  const fatalityEvents = osha.reduce((acc, row) => {
+    const m = row.severity?.match(/^fatality:(\d+)$/i);
+    return acc + Number(m?.[1] ?? 0);
+  }, 0);
+
+  const riskScoreResult = getRiskScore({
+    oshaCount: osha.length,
+    injuryEvents,
+    fatalityEvents,
+    licenseStatus: latestLicenseStatus,
+    hasRegistration: registrations.length > 0,
+    isEntityLikelyReal: entityLooksReal,
+  });
+
+  const officialVerificationLinks = getOfficialVerificationLinks(stateName);
+
+  const sourceLinks = Array.from(new Set([
+    ...osha.map((r) => r.source_url).filter(Boolean),
+    ...licenses.map((r) => r.source_url).filter(Boolean),
+    ...registrations.map((r) => r.source_url).filter(Boolean),
+  ])) as string[];
 
   const locationCityState = page.city
     ? `${page.city}, ${stateName}`
@@ -251,6 +383,15 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         description={`Public compliance records for ${page.company_name}${page.city ? ` · ${page.city}, ${stateName}` : ` · ${stateName}`}`}
       />
 
+      {!entityLooksReal && (
+        <SectionCard title="Entity quality notice">
+          <p>
+            The entity name on this page appears atypical for a registered business name and may reflect a source formatting artifact.
+            Users should confirm legal entity identity directly via official government systems before using this record for decisions.
+          </p>
+        </SectionCard>
+      )}
+
       <SectionCard title="Company description">
         <p>{locationLine}</p>
         <p>{oshaLine}</p>
@@ -286,6 +427,19 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
 
       <section className="company-layout">
         <div className="company-main">
+          <SectionCard title="Compliance Risk Score">
+            <p><strong>Compliance Risk Score:</strong> {riskScoreResult.score} / 100 ({riskScoreResult.level})</p>
+            <p>
+              This score is a decision-support indicator based on publicly available records. It is not a legal determination,
+              and final verification should always be performed with official agencies.
+            </p>
+            <ul>
+              {riskScoreResult.factors.map((factor) => (
+                <li key={factor}>{factor}</li>
+              ))}
+            </ul>
+          </SectionCard>
+
           <SectionCard title="Summary">
             <div className="summary-grid">
               <p><strong>OSHA records</strong><br />{osha.length}</p>
@@ -298,6 +452,19 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
               <p><strong>Last updated</strong><br />{formatDate(page.updated_at)}</p>
             </div>
           </SectionCard>
+
+          {cityBenchmark && cityBenchmark.cityCompanyCount >= 20 && (
+            <SectionCard title={`Benchmark in ${locationCityState}`}>
+              <p>
+                Average OSHA records in this city dataset: <strong>{cityBenchmark.avgOshaRecords.toFixed(1)}</strong>.
+                This company: <strong>{osha.length}</strong>.
+              </p>
+              <p>
+                Active license ratio in local dataset: <strong>{cityBenchmark.activeLicensePct.toFixed(1)}%</strong>.
+                This company license status: <strong>{latestLicenseStatus}</strong>.
+              </p>
+            </SectionCard>
+          )}
 
           <SectionCard title="Risk overview">
             <p>{riskIntro}</p>
@@ -451,6 +618,23 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
             <p>Source: OSHA public records</p>
             <p>Source: State contractor license records</p>
             <p>Source: Secretary of State records</p>
+            {sourceLinks.length > 0 && (
+              <p>
+                Raw source URLs:{' '}
+                {sourceLinks.slice(0, 5).map((url, idx) => (
+                  <span key={url}>
+                    <a href={url} target="_blank" rel="noopener noreferrer">Source {idx + 1}</a>
+                    {idx < Math.min(sourceLinks.length, 5) - 1 ? ' · ' : ''}
+                  </span>
+                ))}
+              </p>
+            )}
+            <p><strong>Verify this record on official government sources:</strong></p>
+            <ul>
+              {officialVerificationLinks.map((item) => (
+                <li key={item.url}><a href={item.url} target="_blank" rel="noopener noreferrer">{item.label}</a></li>
+              ))}
+            </ul>
           </SectionCard>
         </div>
 
@@ -467,6 +651,10 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
                 <li key={c.slug}><a href={c.slug}>{c.company_name}</a></li>
               ))}
             </ul>
+            <p>
+              <a href={`/state/${normalizeStateSlug(page.state)}`}>State page</a> ·{' '}
+              {page.city ? <a href={`/state/${normalizeStateSlug(page.state)}/city/${toCitySlug(page.city)}`}>City page</a> : null}
+            </p>
           </SectionCard>
 
           <SectionCard title="FAQ">

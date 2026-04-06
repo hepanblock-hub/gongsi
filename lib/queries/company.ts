@@ -267,3 +267,56 @@ export async function getCompanyDetailedLocation(companyName: string, state: str
 
   return rows[0]?.detailed_location?.trim() || null;
 }
+
+export async function getCityComplianceBenchmark(
+  state: string,
+  city: string | null
+): Promise<{ avgOshaRecords: number; activeLicensePct: number; cityCompanyCount: number } | null> {
+  if (!city) return null;
+
+  const { rows } = await pool.query<{
+    avg_osha_records: string;
+    active_license_pct: string;
+    city_company_count: string;
+  }>(
+    `WITH city_companies AS (
+       SELECT normalize_company_name(cp.company_name) AS normalized_name
+       FROM company_pages cp
+       WHERE lower(cp.state) = lower($1)
+         AND lower(coalesce(cp.city, '')) = lower($2)
+         AND cp.company_name ~* '[A-Za-z]'
+         AND lower(trim(cp.company_name)) <> '- select -'
+       GROUP BY 1
+     ),
+     osha_counts AS (
+       SELECT oi.normalized_name, COUNT(*)::int AS osha_count
+       FROM osha_inspections oi
+       WHERE lower(oi.state) = lower($1)
+       GROUP BY oi.normalized_name
+     ),
+     latest_license AS (
+       SELECT DISTINCT ON (cl.normalized_name)
+         cl.normalized_name,
+         lower(coalesce(cl.status, 'unknown')) AS license_status
+       FROM contractor_licenses cl
+       WHERE lower(cl.state) = lower($1)
+       ORDER BY cl.normalized_name, cl.issue_date DESC NULLS LAST, cl.created_at DESC
+     )
+     SELECT
+       COALESCE(AVG(COALESCE(oc.osha_count, 0)), 0)::text AS avg_osha_records,
+       COALESCE(AVG(CASE WHEN ll.license_status = 'active' THEN 100 ELSE 0 END), 0)::text AS active_license_pct,
+       COUNT(*)::text AS city_company_count
+     FROM city_companies cc
+     LEFT JOIN osha_counts oc ON oc.normalized_name = cc.normalized_name
+     LEFT JOIN latest_license ll ON ll.normalized_name = cc.normalized_name`,
+    [state, city]
+  );
+
+  if (!rows[0]) return null;
+
+  return {
+    avgOshaRecords: Number(rows[0].avg_osha_records || 0),
+    activeLicensePct: Number(rows[0].active_license_pct || 0),
+    cityCompanyCount: Number(rows[0].city_company_count || 0),
+  };
+}
