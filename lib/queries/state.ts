@@ -241,13 +241,27 @@ export async function getIndexedStates(): Promise<Array<{ slug: string; name: st
 }
 
 export async function getIndexedStateCitiesMap(): Promise<Record<string, string[]>> {
-  const states = await getIndexedStates();
-  const entries = await Promise.all(
-    states.map(async (state) => {
-      const cities = await getStateCityCounts(state.slug);
-      return [state.slug, cities.map((row) => row.city)] as const;
-    })
+  const { rows } = await pool.query<{ state_slug: string; city: string }>(
+    `SELECT
+        lower(regexp_replace(trim(cp.state), '\\s+', '-', 'g')) AS state_slug,
+        CASE
+          WHEN trim(coalesce(cp.city, '')) = '' THEN 'Unknown'
+          ELSE initcap(lower(trim(cp.city)))
+        END AS city
+     FROM company_pages cp
+     WHERE cp.company_name ~* '[A-Za-z]'
+       AND trim(coalesce(cp.state, '')) <> ''
+     GROUP BY 1, 2
+     ORDER BY 1, 2`
   );
 
-  return Object.fromEntries(entries);
+  const map: Record<string, string[]> = {};
+  for (const row of rows) {
+    if (!map[row.state_slug]) {
+      map[row.state_slug] = [];
+    }
+    map[row.state_slug].push(row.city);
+  }
+
+  return map;
 }
