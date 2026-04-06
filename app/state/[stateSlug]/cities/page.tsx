@@ -2,18 +2,13 @@ import type { Metadata } from 'next';
 import Breadcrumbs from '../../../../components/common/Breadcrumbs';
 import PageTitle from '../../../../components/common/PageTitle';
 import SectionCard from '../../../../components/common/SectionCard';
-import { getIndexedStateSlugs, getStateCityCounts } from '../../../../lib/queries';
+import { getStateCityCounts } from '../../../../lib/queries';
 import { stateSlugToName } from '../../../../lib/site';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 function citySlug(value: string): string {
   return value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-}
-
-export async function generateStaticParams() {
-  const slugs = await getIndexedStateSlugs();
-  return slugs.map((stateSlug) => ({ stateSlug }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ stateSlug: string }> }): Promise<Metadata> {

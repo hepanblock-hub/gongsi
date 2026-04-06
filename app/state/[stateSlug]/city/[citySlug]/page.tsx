@@ -3,10 +3,10 @@ import type { Metadata } from 'next';
 import Breadcrumbs from '../../../../../components/common/Breadcrumbs';
 import PageTitle from '../../../../../components/common/PageTitle';
 import SectionCard from '../../../../../components/common/SectionCard';
-import { getIndexedStateSlugs, getStateCityCounts, getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
+import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
 import { stateSlugToName } from '../../../../../lib/site';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 function normalizeCityName(value: string | null): string {
   const raw = (value ?? 'Unknown').trim();
@@ -48,20 +48,6 @@ function compareCompanies(a: StateCompanyCategoryRow, b: StateCompanyCategoryRow
   const scoreDiff = companyQualityScore(b) - companyQualityScore(a);
   if (scoreDiff !== 0) return scoreDiff;
   return a.company_name.localeCompare(b.company_name);
-}
-
-export async function generateStaticParams() {
-  const states = await getIndexedStateSlugs();
-  const params: Array<{ stateSlug: string; citySlug: string }> = [];
-
-  for (const stateSlug of states) {
-    const cities = await getStateCityCounts(stateSlug);
-    for (const row of cities) {
-      params.push({ stateSlug, citySlug: citySlug(row.city) });
-    }
-  }
-
-  return params;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ stateSlug: string; citySlug: string }> }): Promise<Metadata> {

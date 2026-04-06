@@ -4,15 +4,10 @@ import Breadcrumbs from '../../../components/common/Breadcrumbs';
 import PageTitle from '../../../components/common/PageTitle';
 import SectionCard from '../../../components/common/SectionCard';
 import BreadcrumbJsonLd from '../../../components/seo/BreadcrumbJsonLd';
-import { getIndexedStateSlugs, getStateCityCounts, getStateCompanyPagesWithCategory, getStateSummary, type StateCompanyCategoryRow } from '../../../lib/queries';
+import { getStateCityCounts, getStateCompanyPagesWithCategory, getStateSummary, type StateCompanyCategoryRow } from '../../../lib/queries';
 import { SITE_URL, stateSlugToName } from '../../../lib/site';
 
-export const dynamic = 'force-static';
-
-export async function generateStaticParams() {
-  const slugs = await getIndexedStateSlugs();
-  return slugs.map((stateSlug) => ({ stateSlug }));
-}
+export const dynamic = 'force-dynamic';
 
 function citySlug(value: string): string {
   return value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');

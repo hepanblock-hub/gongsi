@@ -3,10 +3,10 @@ import type { Metadata } from 'next';
 import Breadcrumbs from '../../../../../components/common/Breadcrumbs';
 import PageTitle from '../../../../../components/common/PageTitle';
 import SectionCard from '../../../../../components/common/SectionCard';
-import { getIndexedStateSlugs, getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
+import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
 import { stateSlugToName } from '../../../../../lib/site';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 const FILTERS = [
   'quality', 'osha', 'recent', 'active-license',
@@ -130,17 +130,6 @@ function filterDescription(filterSlug: FilterSlug, stateName: string): string {
     default:
       return `Browse public company compliance records in ${stateName}.`;
   }
-}
-
-export async function generateStaticParams() {
-  const states = await getIndexedStateSlugs();
-  const params: Array<{ stateSlug: string; filterSlug: FilterSlug }> = [];
-  for (const stateSlug of states) {
-    for (const filterSlug of FILTERS) {
-      params.push({ stateSlug, filterSlug });
-    }
-  }
-  return params;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ stateSlug: string; filterSlug: string }> }): Promise<Metadata> {
