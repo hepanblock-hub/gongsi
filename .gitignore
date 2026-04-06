@@ -8,3 +8,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 downloads/
+.vscode/
+backups/*.txt
+backups/*.csv
+backups/*.dump
+backups/*.list
+backups/sync_public_*.sql
+backups/local_public_*.sql
