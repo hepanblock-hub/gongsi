@@ -9,6 +9,9 @@ export const pool =
     max: Number(process.env.PGPOOL_MAX ?? 3),
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
+    ssl: process.env.DATABASE_URL?.includes('supabase.com')
+      ? { rejectUnauthorized: false }
+      : undefined,
   });
 
 if (process.env.NODE_ENV !== 'production') {
