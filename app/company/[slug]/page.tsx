@@ -113,24 +113,26 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const sourceCount = [hasOsha, hasLicense, hasRegistration].filter(Boolean).length;
   const location = page.city ? `${page.city}, ${stateName}` : stateName;
 
-  let title = `${page.company_name} – Public Company Record (${stateName})`;
-  let description = `View public company record information for ${page.company_name} in ${location}, with available compliance data from official government sources.`;
+  const cityPart = page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`;
+
+  let title = `${page.company_name} – Public Compliance Record${cityPart}`;
+  let description = `View public compliance records for ${page.company_name}${cityPart}. Includes OSHA inspection history, contractor license status, and business registration details from official government sources.`;
 
   if (hasOsha && hasLicense && hasRegistration) {
-    title = `${page.company_name} – OSHA Violations, License & Registration Status (${stateName})`;
-    description = `View public records for ${page.company_name} in ${location}, including OSHA inspection history, contractor license status, and business registration details.`;
+    title = `${page.company_name} OSHA Violations & License Status${cityPart}`;
+    description = `${page.company_name} OSHA inspection history, contractor license status, and business registration records${cityPart}. Compliance data from official public sources.`;
   } else if (hasOsha && !hasLicense && !hasRegistration) {
-    title = `${page.company_name} – OSHA Inspection Records (${stateName})`;
-    description = `View OSHA inspection records for ${page.company_name} in ${location}, including workplace safety history and reported incidents from public records.`;
+    title = `${page.company_name} OSHA Inspection Records & Violations${cityPart}`;
+    description = `${page.company_name} OSHA inspection records and workplace safety violation history${cityPart}. View reported incidents and workplace safety compliance data.`;
   } else if (!hasOsha && hasLicense && !hasRegistration) {
-    title = `${page.company_name} – Contractor License Status (${stateName})`;
-    description = `Check contractor license status for ${page.company_name} in ${location}, including active, expired, or suspended records from official sources.`;
+    title = `${page.company_name} Contractor License Status${cityPart}`;
+    description = `Check contractor license status for ${page.company_name}${cityPart}. Active, expired, or suspended license records from official state sources.`;
   } else if (!hasOsha && !hasLicense && hasRegistration) {
-    title = `${page.company_name} – Business Registration Status (${stateName})`;
-    description = `Review business registration records for ${page.company_name} in ${location}, including entity status and official public filing details.`;
+    title = `${page.company_name} Business Registration Status${cityPart}`;
+    description = `${page.company_name} business registration status and entity filing records${cityPart}. Public record data from official state sources.`;
   } else if (sourceCount === 2) {
-    title = `${page.company_name} – Public Compliance Records (${stateName})`;
-    description = `View available public compliance records for ${page.company_name} in ${location}, including OSHA history, license status, and registration data where available.`;
+    title = `${page.company_name} OSHA & License Compliance Records${cityPart}`;
+    description = `View OSHA inspection history, contractor license status, and compliance records for ${page.company_name}${cityPart}. Data from official public government sources.`;
   }
 
   return {
@@ -226,15 +228,29 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         ]}
       />
       <PageTitle
-        title={`${page.company_name} – OSHA Violations, License & Registration Status (${stateName})`}
-        description={`State: ${page.state}${page.city ? ` · ${page.city}` : ''}`}
+        title={page.city
+          ? `${page.company_name} OSHA Violations & License Status in ${page.city}, ${stateName}`
+          : `${page.company_name} OSHA Violations & License Status in ${stateName}`
+        }
+        description={`Public compliance records for ${page.company_name}${page.city ? ` · ${page.city}, ${stateName}` : ` · ${stateName}`}`}
       />
 
       <SectionCard title="Company description">
         <p>{locationLine}</p>
         <p>{oshaLine}</p>
-        <p>{recordsLine}</p>
-        <p>{freshnessLine}</p>
+        <p>
+          {licenses.length > 0
+            ? `Contractor license records are available for ${page.company_name} in ${stateName}, showing license status as ${latestLicenseStatus}.`
+            : `No active contractor license records were found in the current datasets for ${page.company_name} in ${stateName}.`}
+          {registrations.length > 0
+            ? ` Business registration records are on file, showing registration status as ${latestRegistrationStatus}.`
+            : ' No verified business registration records were identified in the available public data.'}
+        </p>
+        <p>
+          This page provides a detailed overview of OSHA violation history, contractor license status, and compliance records for {page.company_name}
+          {page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}.
+        </p>
+        <p className="muted">{freshnessLine}</p>
       </SectionCard>
 
       <section className="company-layout">
@@ -338,13 +354,55 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
           </SectionCard>
 
           <SectionCard title="Compliance Summary">
-            <p><strong>Compliance summary:</strong></p>
             <ul>
-              <li>{osha.length > 0 ? 'OSHA inspection records are present' : 'No OSHA inspection records found in current data'}</li>
-              <li>{licenses.length > 0 ? `Contractor license records found (${licenses.length})` : 'No contractor license found'}</li>
-              <li>{registrations.length > 0 ? `Business registration records found (${registrations.length})` : 'No business registration record found'}</li>
+              <li>{osha.length > 0 ? `OSHA inspection records present (${osha.length} records)` : 'No OSHA inspection records found in current data'}</li>
+              <li>{licenses.length > 0 ? `Contractor license records found (${licenses.length}) – status: ${latestLicenseStatus}` : 'No contractor license records found'}</li>
+              <li>{registrations.length > 0 ? `Business registration records found (${registrations.length}) – status: ${latestRegistrationStatus}` : 'No business registration record found'}</li>
             </ul>
-            <p>Users should verify the company's current licensing and registration status through official state agencies before making decisions.</p>
+            <p>Users should verify the company&#39;s current licensing and registration status through official state agencies before making decisions.</p>
+          </SectionCard>
+
+          <SectionCard title="Compliance conclusion">
+            {osha.length > 0 ? (
+              <p>
+                {page.company_name} has {osha.length} recorded OSHA inspection{osha.length > 1 ? 's' : ''}, indicating workplace safety activity
+                {page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}.
+                {osha.length >= 10 ? ' The volume of inspections may indicate significant operational activity or prior safety incidents.' : ''}
+              </p>
+            ) : (
+              <p>No OSHA inspection records were found in the current public dataset for {page.company_name}.</p>
+            )}
+            {licenses.length === 0 && registrations.length === 0 ? (
+              <p>
+                No confirmed contractor license or business registration was identified in the available records.
+                Users are advised to verify the company&#39;s license status directly with {stateName} state authorities if needed.
+              </p>
+            ) : (
+              <p>
+                Current records indicate contractor license status as <strong>{latestLicenseStatus}</strong> and
+                business registration status as <strong>{latestRegistrationStatus}</strong>.
+                Users are advised to confirm current standing directly with official {stateName} state sources.
+              </p>
+            )}
+          </SectionCard>
+
+          <SectionCard title="About OSHA records and license status">
+            <p>
+              OSHA inspection records reflect workplace safety reviews conducted by federal authorities under the
+              Occupational Safety and Health Administration. A higher number of OSHA inspections may indicate
+              increased operational activity or prior workplace safety incidents at a company.
+            </p>
+            <p>
+              Contractor license status is an important compliance factor when evaluating companies in {stateName},
+              especially for construction and other regulated industries. An active license indicates the company
+              meets current state licensing requirements. Expired or suspended license status should be verified
+              through official {stateName} state licensing authorities.
+            </p>
+            <p>
+              Missing or unknown license records in this dataset do not necessarily mean a company is unlicensed.
+              Users are encouraged to cross-reference with the official {stateName} contractor license lookup portal
+              for the most current compliance record information.
+            </p>
           </SectionCard>
 
           <SectionCard title="Timeline">
@@ -381,10 +439,22 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
           </SectionCard>
 
           <SectionCard title="FAQ">
-            <p><strong>What does this page show?</strong><br />A combined view of public OSHA, license, and registration records.</p>
-            <p><strong>How often is data updated?</strong><br />On periodic refresh cycles based on source availability.</p>
-            <p><strong>Is this official?</strong><br />Records are sourced from official public agencies.</p>
+            <p><strong>What does this page show?</strong><br />A combined view of public OSHA inspection history, contractor license status, and business registration compliance records for {page.company_name}{page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}.</p>
             <p><strong>Does {page.company_name} have OSHA violations?</strong><br />{oshaFaqAnswer}</p>
+            <p><strong>What is the contractor license status for {page.company_name}?</strong><br />
+              {licenses.length > 0
+                ? `Contractor license records are on file showing status: ${latestLicenseStatus}. Verify current standing through official ${stateName} state sources.`
+                : `No contractor license records were found in the current dataset for ${page.company_name} in ${stateName}. Check the official state licensing portal for the most current information.`
+              }
+            </p>
+            <p><strong>Is {page.company_name} registered as a business in {stateName}?</strong><br />
+              {registrations.length > 0
+                ? `Business registration records are available, showing status: ${latestRegistrationStatus}.`
+                : `No business registration records were found in the current dataset. Verify through the ${stateName} Secretary of State directly.`
+              }
+            </p>
+            <p><strong>How often is this compliance data updated?</strong><br />Records are refreshed on periodic cycles based on source availability from official government agencies including OSHA and state licensing bodies.</p>
+            <p><strong>Is this data from official sources?</strong><br />Yes. All OSHA inspection data, contractor license records, and business registration information is sourced from official public government agencies.</p>
           </SectionCard>
         </aside>
       </section>
