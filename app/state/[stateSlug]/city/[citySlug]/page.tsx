@@ -50,13 +50,54 @@ function compareCompanies(a: StateCompanyCategoryRow, b: StateCompanyCategoryRow
   return a.company_name.localeCompare(b.company_name);
 }
 
+type DecisionSignal = 'Lower review risk' | 'Needs manual review' | 'Higher review risk';
+
+function getDecisionSignal(c: StateCompanyCategoryRow): DecisionSignal {
+  const license = (c.license_status ?? 'unknown').toLowerCase();
+  if (license === 'suspended' || license === 'revoked') return 'Higher review risk';
+  if ((c.injury_count ?? 0) >= 1 && (c.osha_count ?? 0) >= 5) return 'Higher review risk';
+  if (license === 'expired' || license === 'unknown') return 'Needs manual review';
+  if (license === 'active' && c.has_registration) return 'Lower review risk';
+  return 'Needs manual review';
+}
+
+function getDecisionNote(c: StateCompanyCategoryRow, stateName: string): string {
+  const license = (c.license_status ?? 'unknown').toLowerCase();
+  if (license === 'active' && c.has_registration && (c.injury_count ?? 0) === 0) {
+    return `Active-license signal. Confirm current standing through ${stateName} official systems.`;
+  }
+  if (license === 'suspended' || license === 'revoked') {
+    return `Suspended/revoked signal. Verify with ${stateName} licensing board before hiring.`;
+  }
+  if ((c.injury_count ?? 0) >= 1) {
+    return 'Injury-related OSHA records present. Review inspection details before contracting.';
+  }
+  if (license === 'expired') {
+    return 'Expired-license signal. Check whether renewal has been completed.';
+  }
+  return 'Incomplete public records. Manual verification is recommended.';
+}
+
+function inferIndustryTag(companyName: string): string {
+  const n = companyName.toLowerCase();
+  if (/(roof|roofing)/.test(n)) return 'Roofing';
+  if (/(electrical|electric)/.test(n)) return 'Electrical';
+  if (/(plumb|plumbing)/.test(n)) return 'Plumbing';
+  if (/(hvac|heating|air\s?conditioning|cooling)/.test(n)) return 'HVAC';
+  if (/(concrete|cement|masonry)/.test(n)) return 'Concrete/Masonry';
+  if (/(landscape|landscaping|tree\s?service)/.test(n)) return 'Landscaping';
+  if (/(paint|painting)/.test(n)) return 'Painting';
+  if (/(construction|builders|contractor)/.test(n)) return 'General Construction';
+  return 'Other';
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ stateSlug: string; citySlug: string }> }): Promise<Metadata> {
   const { stateSlug, citySlug } = await params;
   const stateName = stateSlugToName(stateSlug);
   const cityName = citySlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   return {
     title: { absolute: `${cityName} Contractor License Lookup, OSHA Records & Company Compliance Data` },
-    description: `Search and review public company compliance records in ${cityName}, ${stateName}. Check contractor license status, OSHA inspection history, and business registration data from official government sources.`,
+    description: `Decision-focused company compliance guide for ${cityName}, ${stateName}. Review OSHA inspection patterns, contractor license status signals, and verification workflow before hiring or vendor selection.`,
     alternates: { canonical: `/state/${stateSlug}/city/${citySlug}` },
   };
 }
@@ -81,6 +122,31 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
   const oshaPct = ((oshaCount / base) * 100).toFixed(1);
   const licensePct = ((licenseCount / base) * 100).toFixed(1);
   const registrationPct = ((registrationCount / base) * 100).toFixed(1);
+  const activeLicenseCount = companies.filter((c) => (c.license_status ?? '').toLowerCase() === 'active').length;
+  const suspendedLicenseCount = companies.filter((c) => (c.license_status ?? '').toLowerCase() === 'suspended').length;
+  const expiredLicenseCount = companies.filter((c) => (c.license_status ?? '').toLowerCase() === 'expired').length;
+  const injuryLinkedCount = companies.filter((c) => (c.injury_count ?? 0) > 0).length;
+
+  const topCompanies = companies.slice(0, 200);
+  const decisionStats = topCompanies.reduce(
+    (acc, c) => {
+      const signal = getDecisionSignal(c);
+      if (signal === 'Lower review risk') acc.lower += 1;
+      else if (signal === 'Needs manual review') acc.manual += 1;
+      else acc.higher += 1;
+      return acc;
+    },
+    { lower: 0, manual: 0, higher: 0 }
+  );
+
+  const industryCounts = new Map<string, number>();
+  for (const c of topCompanies) {
+    const tag = inferIndustryTag(c.company_name);
+    industryCounts.set(tag, (industryCounts.get(tag) ?? 0) + 1);
+  }
+  const topIndustries = Array.from(industryCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
 
   return (
     <main className="container">
@@ -95,7 +161,7 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
 
       <PageTitle
         title={`${cityName}, ${stateName} Contractor License Lookup & OSHA Records`}
-        description={`Public compliance records and business verification for ${cityName}, ${stateName}`}
+        description={`Decision-focused screening page for contractor compliance checks in ${cityName}, ${stateName}`}
       />
 
       <SectionCard title={`Compliance records in ${cityName}, ${stateName}`}>
@@ -107,6 +173,9 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
           Users can search and review public records to verify company credentials, check workplace safety history,
           and assess compliance risk before hiring or working with a business.
         </p>
+        <p>
+          This is a preliminary screening page (not a real-time official license API). Final legal verification should be completed through official {stateName} government systems.
+        </p>
       </SectionCard>
 
       <SectionCard title={`How to check a company in ${cityName}`}>
@@ -114,8 +183,28 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
           <li>Search for the company name using the search bar on this page</li>
           <li>Review OSHA inspection records and safety history</li>
           <li>Check contractor license status if available</li>
-          <li>Verify business registration through official {stateName} state sources</li>
+          <li>Verify license and registration through official {stateName} state sources before hiring</li>
         </ol>
+      </SectionCard>
+
+      <SectionCard title={`Local compliance patterns in ${cityName}`}>
+        <p>
+          In the indexed dataset for {cityName}, {oshaPct}% of companies show OSHA inspection history, {licensePct}% show contractor license records,
+          and {registrationPct}% show business registration references.
+        </p>
+        <p>
+          Active license signals appear in {activeLicenseCount} companies, while suspended/expired signals appear in {suspendedLicenseCount + expiredLicenseCount} companies.
+          Injury-linked OSHA records appear in {injuryLinkedCount} companies and should be prioritized for manual review.
+        </p>
+        {topIndustries.length > 0 && (
+          <p>
+            Common business categories in this city dataset: {topIndustries.map(([name, count], idx) => (
+              <span key={name}>
+                {name} ({count}){idx < topIndustries.length - 1 ? ' · ' : ''}
+              </span>
+            ))}
+          </p>
+        )}
       </SectionCard>
 
       <SectionCard title="Why checking company compliance matters">
@@ -125,22 +214,41 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
         </p>
       </SectionCard>
 
+      <SectionCard title="Decision support summary (top 200)">
+        <p>
+          Lower review risk: <strong>{decisionStats.lower}</strong> ·
+          Needs manual review: <strong>{decisionStats.manual}</strong> ·
+          Higher review risk: <strong>{decisionStats.higher}</strong>
+        </p>
+        <p>
+          These are screening signals for prioritization only. Always verify final license and legal status through official {stateName} agencies.
+        </p>
+      </SectionCard>
+
       <div id="company-list" />
       <SectionCard title="Company list">
-        <p>{cityName} · {companies.length} indexed companies</p>
+        <p>{cityName} · {topCompanies.length} companies shown (from {companies.length} indexed companies)</p>
         <table>
           <thead>
             <tr>
               <th>Company</th>
               <th>Profile</th>
+              <th>OSHA Records</th>
+              <th>License Status</th>
+              <th>Screening Signal</th>
+              <th>Screening Note</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {companies.map((c) => (
+            {topCompanies.map((c) => (
               <tr key={c.slug}>
                 <td><a href={c.slug}>{c.company_name}</a></td>
                 <td>{categoryOfCompany(c)}</td>
+                <td>{c.osha_count || 0}</td>
+                <td>{c.license_status ?? 'Unknown'}</td>
+                <td>{getDecisionSignal(c)}</td>
+                <td>{getDecisionNote(c, stateName)}</td>
                 <td>
                   <a href={`${c.slug}#osha-records`}>OSHA</a> · <a href={`${c.slug}#license-records`}>License</a> ·{' '}
                   <a href={`${c.slug}#registration-records`}>Registration</a>
@@ -153,22 +261,12 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
 
       <SectionCard title={`${cityName} compliance overview`}>
         <p>
-          <strong>Compliance distribution for {cityName}, {stateName}</strong>
+          Full profiles (OSHA + License + Registration): {fullCount} · Partial profiles: {partialCount}.
+          This distribution helps identify which companies have enough data for stronger due diligence decisions.
         </p>
         <p>
-          Within the indexed companies for {cityName}, {oshaPct}% have OSHA inspection records, {licensePct}% have contractor license records,
-          and {registrationPct}% have business registration records.
-        </p>
-        <p>
-          This distribution indicates that most companies in {cityName} have licensing data available, while a smaller portion have recorded workplace safety inspections.
-          Companies with full profiles provide access to all three data types, while others may have partial or limited public records available.
-        </p>
-        <p>
-          Full profiles (all three records): {fullCount} · Partial profiles (any two records): {partialCount}.
-          This breakdown helps prioritize deeper review for vendors or employers with broader public compliance visibility.
-        </p>
-        <p>
-          City-level results are based on currently indexed public datasets and should be cross-checked with official {stateName} state sources for final verification.
+          For high-value contracts, prioritize companies with active license signals and complete profile coverage,
+          then validate with official state records before final selection.
         </p>
       </SectionCard>
 
