@@ -52,7 +52,7 @@ function canonicalStateSlug(rawState: string): string | null {
 }
 
 function normalizeCityForUi(rawCity: string): string {
-  const trimmed = rawCity.trim();
+  const trimmed = rawCity.trim().replace(/^"+|"+$/g, '');
   if (!trimmed) return 'Unknown';
 
   const withoutStateSuffix = trimmed

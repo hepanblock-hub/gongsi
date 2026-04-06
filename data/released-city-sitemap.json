@@ -1,0 +1,9 @@
+{
+  "california": [
+    { "slug": "los-angeles", "name": "Los Angeles" },
+    { "slug": "san-diego", "name": "San Diego" },
+    { "slug": "san-jose", "name": "San Jose" },
+    { "slug": "sacramento", "name": "Sacramento" },
+    { "slug": "san-francisco", "name": "San Francisco" }
+  ]
+}

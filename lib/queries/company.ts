@@ -24,6 +24,7 @@ function sanitizeCity(value: string | null): string | null {
   if (!value) return null;
   const withoutStateSuffix = value
     .trim()
+    .replace(/^"+|"+$/g, '')
     .replace(/,\s*(ca|california)\b.*$/i, '')
     .replace(/\s+/g, ' ')
     .trim();
