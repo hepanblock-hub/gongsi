@@ -86,7 +86,7 @@ function filterTitle(filterSlug: FilterSlug, stateName: string): string {
     case 'basic-listings':
       return `${stateName} Basic Company Records`;
     case 'quality':
-      return `${stateName} Public Company Records`;
+      return `Top Companies with Quality Compliance Profiles in ${stateName} (2026 Data)`;
     case 'osha-only':
       return `${stateName} OSHA Inspection Records`;
     default: return `${stateName} company records`;
@@ -124,7 +124,7 @@ function filterDescription(filterSlug: FilterSlug, stateName: string): string {
     case 'basic-listings':
       return `Browse basic public company listings in ${stateName} and review available compliance data from official government sources.`;
     case 'quality':
-      return `Browse public company records in ${stateName} with quality-prioritized compliance profiles and official source coverage.`;
+      return `Browse top companies in ${stateName} ranked by compliance data quality and completeness. Companies are prioritized based on OSHA records, contractor license availability, and registration data coverage from official public sources.`;
     case 'osha-only':
       return `View companies in ${stateName} with OSHA inspection records available from official public sources.`;
     default:
@@ -230,8 +230,67 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
 
       <PageTitle
         title={filterTitle(filterSlug, stateName)}
-        description="Static filtered company list for this state."
+        description={(() => {
+          const descriptions: Record<string, string> = {
+            'quality': 'Companies ranked by compliance data completeness and recency',
+            'osha': 'Browse by OSHA inspection frequency and severity',
+            'osha-violations': 'Browse by OSHA inspection frequency and severity',
+            'license-only': 'Contractor license records only',
+            'contractor-licenses': 'Contractor license records available',
+            'registration-only': 'Business registration records only',
+            'business-registration': 'Business registration records available',
+            'active-license': 'Companies with active contractor licenses',
+            'active-licenses': 'Companies with active contractor licenses',
+            'expired-licenses': 'Companies with expired contractor licenses',
+            'suspended-licenses': 'Companies with suspended contractor licenses',
+            'recent': 'Most recently inspected and updated',
+            'recently-updated': 'Most recently updated compliance records',
+            'full': 'OSHA + License + Registration combined',
+            'full-profiles': 'OSHA + License + Registration combined',
+            'partial': 'Two data types available',
+            'partial-profiles': 'Two compliance data types available',
+            'basic': 'Basic company listings',
+            'basic-listings': 'Basic company records',
+            'osha-only': 'OSHA inspection records only',
+          };
+          return descriptions[filterSlug as string] || 'Filtered company records';
+        })()}
       />
+
+
+      {filterSlug === 'quality' && (
+        <SectionCard title={`Top ${stateName} Companies by Compliance Quality`}>
+          <p>
+            This page lists companies in {stateName} ranked by the quality and completeness of their publicly available compliance data.
+            Companies are sorted based on OSHA inspection records, contractor license availability, business registration status, and data freshness.
+          </p>
+          <p><strong>Ranking methodology:</strong></p>
+          <ul>
+            <li>Number of OSHA inspection records (higher indicates more documented workplace safety activity)</li>
+            <li>Availability of contractor license data (presence indicates regulatory compliance tracking)</li>
+            <li>Business registration records (indicates formal business entity documentation)</li>
+            <li>Data freshness and recency of compliance records</li>
+            <li>Completeness of public record visibility across all three data types</li>
+          </ul>
+          <p><strong>This list is commonly used for:</strong></p>
+          <ul>
+            <li>Contractor screening and vendor risk assessment</li>
+            <li>Evaluating company compliance history before hiring</li>
+            <li>Workplace safety research and compliance pattern analysis</li>
+            <li>Verifying regulatory status before business partnerships</li>
+          </ul>
+        </SectionCard>
+      )}
+
+      {(filterSlug === 'osha' || filterSlug === 'osha-violations') && (
+        <SectionCard title={`${stateName} Companies by OSHA Inspection Activity`}>
+          <p>
+            This page lists companies in {stateName} with the highest number of OSHA inspection records.
+            A higher number of inspections typically indicates greater operational activity or prior workplace safety incidents.
+          </p>
+          <p>Companies are ranked by total OSHA inspection count, helping identify patterns of workplace safety oversight.</p>
+        </SectionCard>
+      )}
 
       <div id="company-list" />
       <SectionCard title="Company list">
@@ -241,6 +300,8 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
             <tr>
               <th>Company</th>
               <th>City</th>
+              <th>OSHA Records</th>
+              <th>License Status</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -249,6 +310,8 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
               <tr key={c.slug}>
                 <td><a href={c.slug}>{c.company_name}</a></td>
                 <td>{(c.city ?? 'Unknown').toLowerCase().replace(/\b\w/g, (x) => x.toUpperCase())}</td>
+                <td>{c.osha_count || 0}</td>
+                <td>{c.license_status ?? 'Unknown'}</td>
                 <td>
                   <a href={`${c.slug}#osha-records`}>OSHA</a> · <a href={`${c.slug}#license-records`}>License</a> ·{' '}
                   <a href={`${c.slug}#registration-records`}>Registration</a>
