@@ -55,6 +55,84 @@ function compareCompanies(a: StateCompanyCategoryRow, b: StateCompanyCategoryRow
   return a.company_name.localeCompare(b.company_name);
 }
 
+type DecisionSignal = 'Lower review risk' | 'Needs manual review' | 'Higher review risk';
+
+function getDecisionSignal(c: StateCompanyCategoryRow): DecisionSignal {
+  const license = (c.license_status ?? 'unknown').toLowerCase();
+  if (license === 'suspended' || license === 'revoked') return 'Higher review risk';
+  if ((c.injury_count ?? 0) >= 1 && (c.osha_count ?? 0) >= 5) return 'Higher review risk';
+  if (license === 'expired' || license === 'unknown') return 'Needs manual review';
+  if (license === 'active' && c.has_registration) return 'Lower review risk';
+  return 'Needs manual review';
+}
+
+function getDecisionNote(c: StateCompanyCategoryRow, stateName: string): string {
+  const license = (c.license_status ?? 'unknown').toLowerCase();
+  if (license === 'active' && c.has_registration && (c.injury_count ?? 0) === 0) {
+    return `License appears active. Confirm current standing with ${stateName} official agencies before hiring.`;
+  }
+  if (license === 'suspended' || license === 'revoked') {
+    return `Suspended/revoked license signal. Verify immediately with ${stateName} licensing board.`;
+  }
+  if ((c.injury_count ?? 0) >= 1) {
+    return 'Injury-related OSHA records found. Review inspection details before contracting.';
+  }
+  if (license === 'expired') {
+    return `Expired license signal. Confirm whether renewal is completed with ${stateName} authorities.`;
+  }
+  return 'Insufficient public data. Perform manual verification before decisions.';
+}
+
+function filterIntentCopy(filterSlug: FilterSlug, stateName: string): { title: string; intro: string; bullets: string[] } {
+  switch (filterSlug) {
+    case 'quality':
+      return {
+        title: `How to use this ${stateName} quality list`,
+        intro: `This ranking is designed for vendor screening and hiring decisions, not just browsing. Companies are sorted by public-record completeness, licensing visibility, and safety record evidence.`,
+        bullets: [
+          'Start with companies marked as Lower review risk, then verify state licensing directly.',
+          'Treat Needs manual review as a verification queue before contracting.',
+          'Treat Higher review risk as priority for deeper due diligence.',
+        ],
+      };
+    case 'osha':
+    case 'osha-violations':
+    case 'osha-only':
+      return {
+        title: `How to interpret OSHA-focused results in ${stateName}`,
+        intro: 'Higher OSHA record counts indicate more documented inspection activity, but do not automatically prove current safety non-compliance. Use this list to identify where deeper review is needed.',
+        bullets: [
+          'Check injury-related records first for screening priority.',
+          'Cross-check license status before hiring decisions.',
+          'Review the company profile timeline for context and recency.',
+        ],
+      };
+    case 'active-license':
+    case 'active-licenses':
+    case 'contractor-licenses':
+    case 'license-only':
+      return {
+        title: `How to use contractor license results in ${stateName}`,
+        intro: 'This page is intended for license-first verification. Active status is a positive signal, but users should still validate the license number and current standing through official state systems.',
+        bullets: [
+          'Prioritize Active license entries for initial shortlist.',
+          'Move Unknown/Expired entries to manual verification.',
+          'Use OSHA and registration links for additional risk context.',
+        ],
+      };
+    default:
+      return {
+        title: `How to use this filtered list in ${stateName}`,
+        intro: 'This filtered view supports preliminary compliance screening. Use it to narrow candidates, then confirm legal status with official agencies before hiring or contracting.',
+        bullets: [
+          'Shortlist candidates with stronger compliance visibility.',
+          'Review OSHA, License, and Registration sections per company.',
+          `Verify final eligibility directly with ${stateName} official sources.`,
+        ],
+      };
+  }
+}
+
 function filterTitle(filterSlug: FilterSlug, stateName: string): string {
   switch (filterSlug) {
     case 'osha':
@@ -218,6 +296,19 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
 
   if (!companies.length) notFound();
 
+  const topCompanies = companies.slice(0, 200);
+  const decisionStats = topCompanies.reduce(
+    (acc, c) => {
+      const signal = getDecisionSignal(c);
+      if (signal === 'Lower review risk') acc.lower += 1;
+      else if (signal === 'Needs manual review') acc.manual += 1;
+      else acc.higher += 1;
+      return acc;
+    },
+    { lower: 0, manual: 0, higher: 0 }
+  );
+  const intentCopy = filterIntentCopy(filterSlug, stateName);
+
   return (
     <main className="container">
       <Breadcrumbs
@@ -258,43 +349,30 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
       />
 
 
-      {filterSlug === 'quality' && (
-        <SectionCard title={`Top ${stateName} Companies by Compliance Quality`}>
-          <p>
-            This page lists companies in {stateName} ranked by the quality and completeness of their publicly available compliance data.
-            Companies are sorted based on OSHA inspection records, contractor license availability, business registration status, and data freshness.
-          </p>
-          <p><strong>Ranking methodology:</strong></p>
-          <ul>
-            <li>Number of OSHA inspection records (higher indicates more documented workplace safety activity)</li>
-            <li>Availability of contractor license data (presence indicates regulatory compliance tracking)</li>
-            <li>Business registration records (indicates formal business entity documentation)</li>
-            <li>Data freshness and recency of compliance records</li>
-            <li>Completeness of public record visibility across all three data types</li>
-          </ul>
-          <p><strong>This list is commonly used for:</strong></p>
-          <ul>
-            <li>Contractor screening and vendor risk assessment</li>
-            <li>Evaluating company compliance history before hiring</li>
-            <li>Workplace safety research and compliance pattern analysis</li>
-            <li>Verifying regulatory status before business partnerships</li>
-          </ul>
-        </SectionCard>
-      )}
+      <SectionCard title={intentCopy.title}>
+        <p>{intentCopy.intro}</p>
+        <ul>
+          {intentCopy.bullets.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </SectionCard>
 
-      {(filterSlug === 'osha' || filterSlug === 'osha-violations') && (
-        <SectionCard title={`${stateName} Companies by OSHA Inspection Activity`}>
-          <p>
-            This page lists companies in {stateName} with the highest number of OSHA inspection records.
-            A higher number of inspections typically indicates greater operational activity or prior workplace safety incidents.
-          </p>
-          <p>Companies are ranked by total OSHA inspection count, helping identify patterns of workplace safety oversight.</p>
-        </SectionCard>
-      )}
+      <SectionCard title="Decision support summary (top 200)">
+        <p>
+          Lower review risk: <strong>{decisionStats.lower}</strong> ·
+          Needs manual review: <strong>{decisionStats.manual}</strong> ·
+          Higher review risk: <strong>{decisionStats.higher}</strong>
+        </p>
+        <p>
+          These signals are screening aids based on public records and should not be treated as legal conclusions.
+          Always confirm final status with official {stateName} agencies.
+        </p>
+      </SectionCard>
 
       <div id="company-list" />
       <SectionCard title="Company list">
-        <p>Showing top {Math.min(companies.length, 200)} companies</p>
+        <p>Showing top {topCompanies.length} companies</p>
         <table>
           <thead>
             <tr>
@@ -302,16 +380,20 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
               <th>City</th>
               <th>OSHA Records</th>
               <th>License Status</th>
+              <th>Screening Signal</th>
+              <th>Screening Note</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {companies.slice(0, 200).map((c) => (
+            {topCompanies.map((c) => (
               <tr key={c.slug}>
                 <td><a href={c.slug}>{c.company_name}</a></td>
                 <td>{(c.city ?? 'Unknown').toLowerCase().replace(/\b\w/g, (x) => x.toUpperCase())}</td>
                 <td>{c.osha_count || 0}</td>
                 <td>{c.license_status ?? 'Unknown'}</td>
+                <td>{getDecisionSignal(c)}</td>
+                <td>{getDecisionNote(c, stateName)}</td>
                 <td>
                   <a href={`${c.slug}#osha-records`}>OSHA</a> · <a href={`${c.slug}#license-records`}>License</a> ·{' '}
                   <a href={`${c.slug}#registration-records`}>Registration</a>
