@@ -1,0 +1,1 @@
+{"generatedAt":"2026-04-07T03:55:42.632Z","namespace":"query_getCompanyTimeline","payload":{"companyName":"SWIM CARE POOL SERVICES","state":"CA","limit":12},"data":[{"event_date":"2015-05-10","event_type":"License update","detail":"CLEAR"}]}

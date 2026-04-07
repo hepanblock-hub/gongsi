@@ -21,6 +21,22 @@ function sanitizeDatabaseUrl(rawUrl: string | undefined): string | undefined {
 
 const connectionString = sanitizeDatabaseUrl(process.env.DATABASE_URL);
 
+function isLocalDatabaseConnection(rawUrl: string | undefined): boolean {
+  const hostFromEnv = (process.env.DB_HOST ?? '').toLowerCase();
+  if (hostFromEnv === 'localhost' || hostFromEnv === '127.0.0.1') return true;
+
+  if (!rawUrl) return false;
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname.toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+const useLocalConnection = isLocalDatabaseConnection(connectionString);
+
 export const pool =
   globalForPg.pool ??
   new Pool({
@@ -28,7 +44,7 @@ export const pool =
     max: Number(process.env.DATABASE_POOL_MAX ?? process.env.PGPOOL_MAX ?? 1),
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
-    ssl: { rejectUnauthorized: false },
+    ssl: useLocalConnection ? false : { rejectUnauthorized: false },
   });
 
 if (process.env.NODE_ENV !== 'production') {

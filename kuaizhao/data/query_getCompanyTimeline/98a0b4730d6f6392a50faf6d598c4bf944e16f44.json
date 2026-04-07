@@ -1,0 +1,1 @@
+{"generatedAt":"2026-04-07T03:55:46.488Z","namespace":"query_getCompanyTimeline","payload":{"companyName":"GUEVARA'S PAINTING INC","state":"CA","limit":12},"data":[{"event_date":"2024-01-23","event_type":"License update","detail":"CLEAR"},{"event_date":"2015-03-16","event_type":"License update","detail":"CLEAR"}]}

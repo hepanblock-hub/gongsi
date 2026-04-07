@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Breadcrumbs from '../../../components/common/Breadcrumbs';
+import DecisionSupportLayers, { buildBottomLineAssessment } from '../../../components/company/DecisionSupportLayers';
 import PageTitle from '../../../components/common/PageTitle';
 import SectionCard from '../../../components/common/SectionCard';
 import StatusBadge from '../../../components/common/StatusBadge';
@@ -332,8 +333,8 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
     : 'According to publicly available records, no OSHA inspection records were found in the current dataset.';
 
   const recordsLine = licenses.length === 0 && registrations.length === 0
-    ? 'No contractor license or business registration records were found in the current datasets for this company.'
-    : `${licenses.length === 0 ? 'No contractor license records were found.' : `Contractor license records are available (${licenses.length} record${licenses.length > 1 ? 's' : ''}).`} ${registrations.length === 0 ? 'No business registration records were found.' : `Business registration records are available (${registrations.length} record${registrations.length > 1 ? 's' : ''}).`}`;
+    ? 'No contractor license or business registration records were observed in current datasets.'
+    : `Observed records: ${licenses.length} license record${licenses.length > 1 ? 's' : ''} and ${registrations.length} registration record${registrations.length > 1 ? 's' : ''}.`;
 
   const riskIntro = pickVariant(page.company_name, [
     'Based on available public records, this company has recorded OSHA inspections, indicating past workplace safety activity.',
@@ -368,6 +369,16 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
   });
 
   const officialVerificationLinks = getOfficialVerificationLinks(stateName);
+  const bottomLine = buildBottomLineAssessment({
+    riskLevel: riskScoreResult.level,
+    score: riskScoreResult.score,
+    hasLicense: licenses.length > 0,
+    hasRegistration: registrations.length > 0,
+    licenseStatus: latestLicenseStatus,
+    registrationStatus: latestRegistrationStatus,
+    entityLooksReal,
+    fatalityEvents,
+  });
 
   const sourceLinks = Array.from(new Set([
     ...osha.map((r) => r.source_url).filter(Boolean),
@@ -425,7 +436,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
 
       <SectionCard title="Official verification quick actions">
         <p>
-          Use this page for screening, then validate with official systems before any legal, hiring, or procurement decision.
+          Use this page for screening, then validate with agency portals before any legal, hiring, or procurement decision.
         </p>
         <ul>
           {officialVerificationLinks.map((item) => (
@@ -447,10 +458,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         <p>{locationLine}</p>
         <p>{oshaLine}</p>
         <p>{recordsLine}</p>
-        <p>
-          Screening snapshot: OSHA {osha.length} · License {licenses.length} · Registration {registrations.length}.
-          Use this page to prioritize verification steps before final hiring or vendor decisions.
-        </p>
+        <p>Screening snapshot: OSHA {osha.length} · License {licenses.length} · Registration {registrations.length}.</p>
         <p className="muted">{freshnessLine}</p>
       </SectionCard>
 
@@ -473,16 +481,19 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         <div className="company-main">
           <SectionCard title="Compliance Risk Score">
             <p><strong>Compliance Risk Score:</strong> {riskScoreResult.score} / 100 ({riskScoreResult.level})</p>
-            <p>
-              This score is a decision-support indicator based on publicly available records. It is not a legal determination,
-              and final verification should always be performed with official agencies.
-            </p>
+            <p>This score is a screening signal generated from public records and should be combined with official verification.</p>
             <ul>
               {riskScoreResult.factors.map((factor) => (
                 <li key={factor}>{factor}</li>
               ))}
             </ul>
           </SectionCard>
+
+          <DecisionSupportLayers
+            companyName={page.company_name}
+            stateName={stateName}
+            bottomLine={bottomLine}
+          />
 
           <SectionCard title="Summary">
             <div className="summary-grid">
@@ -517,8 +528,8 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
             <p>
               Recommended next step:{' '}
               {latestLicenseStatus.toLowerCase() === 'active' && registrations.length > 0
-                ? `Complete official verification and keep ${page.company_name} in shortlist.`
-                : `Run manual verification first using ${stateName} official licensing and business registries.`}
+                ? `Complete agency-portal verification and keep ${page.company_name} in shortlist.`
+                : `Run manual verification first using ${stateName} licensing and business registries.`}
             </p>
             <p><StatusBadge label={osha.length ? 'OSHA inspections present' : 'No OSHA inspections found'} tone={osha.length ? 'warn' : 'good'} /></p>
             <p><StatusBadge label={`Contractor license: ${latestLicenseStatus}`} tone={latestLicenseStatus === 'active' ? 'good' : 'neutral'} /></p>
@@ -573,7 +584,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
                 ))}
               </tbody>
             </table>
-            {!licenses.length && <p>No license records found for this company/state combination.</p>}
+            {!licenses.length && <p>No contractor license entry was observed for this company/state combination.</p>}
           </SectionCard>
 
           <div id="registration-records" />
@@ -598,7 +609,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
                 ))}
               </tbody>
             </table>
-            {!registrations.length && <p>No registration records found for this company/state combination.</p>}
+            {!registrations.length && <p>No business registration entry was observed for this company/state combination.</p>}
           </SectionCard>
 
           <SectionCard title="Record interpretation">
@@ -607,10 +618,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
               <li>{licenses.length > 0 ? `Contractor license status: ${latestLicenseStatus}` : 'No contractor license record found in current dataset'}</li>
               <li>{registrations.length > 0 ? `Business registration status: ${latestRegistrationStatus}` : 'No business registration record found in current dataset'}</li>
             </ul>
-            <p>
-              Interpretation rule: missing records in this dataset should be treated as "not observed" rather than definitive legal absence.
-              Final qualification should be confirmed via official agency systems listed in the Sources section.
-            </p>
+            <p>Missing records here should be treated as "not yet observed" and trigger targeted manual verification.</p>
           </SectionCard>
 
           <SectionCard title="Timeline">
@@ -639,7 +647,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
                 ))}
               </p>
             )}
-            <p><strong>Verify this record on official government sources:</strong></p>
+            <p><strong>Verify this record on government source portals:</strong></p>
             <ul>
               {officialVerificationLinks.map((item) => (
                 <li key={item.url}><a href={item.url} target="_blank" rel="noopener noreferrer">{item.label}</a></li>
@@ -650,10 +658,9 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
           <SectionCard title="Editorial and methodology note">
             <p>
               Maintained by the Compliance Lookup Editorial Team. Data is aggregated from official public sources and normalized for screening use.
-              This page is not legal advice and may lag behind real-time agency updates.
             </p>
             <p>
-              For YMYL decisions, official agency records are authoritative and should be treated as final source of truth.
+              For high-stakes decisions, official agency records remain the authoritative source of truth.
             </p>
           </SectionCard>
 
@@ -691,16 +698,17 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
           <SectionCard title="FAQ">
             <p><strong>What does this page show?</strong><br />A combined view of public OSHA inspection history, contractor license status, and business registration compliance records for {page.company_name}{page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}.</p>
             <p><strong>Does {page.company_name} have OSHA violations?</strong><br />{oshaFaqAnswer}</p>
+            <p><strong>Is {page.company_name} legit based on current public data?</strong><br />{bottomLine.plainAnswer}</p>
             <p><strong>What is the contractor license status for {page.company_name}?</strong><br />
               {licenses.length > 0
-                ? `Contractor license records are on file showing status: ${latestLicenseStatus}. Verify current standing through official ${stateName} state sources.`
-                : `No contractor license records were found in the current dataset for ${page.company_name} in ${stateName}. Check the official state licensing portal for the most current information.`
+                ? `Contractor license records are on file showing status: ${latestLicenseStatus}. Verify current standing through ${stateName} state sources.`
+                : `No contractor license records were observed in the current dataset for ${page.company_name} in ${stateName}. Check the state licensing portal for the most current information.`
               }
             </p>
             <p><strong>Is {page.company_name} registered as a business in {stateName}?</strong><br />
               {registrations.length > 0
                 ? `Business registration records are available, showing status: ${latestRegistrationStatus}.`
-                : `No business registration records were found in the current dataset. Verify through the ${stateName} Secretary of State directly.`
+                : `No business registration records were observed in the current dataset. Verify through the ${stateName} Secretary of State directly.`
               }
             </p>
             <p><strong>How often is this compliance data updated?</strong><br />Records are refreshed on periodic cycles based on source availability from official government agencies including OSHA and state licensing bodies.</p>
