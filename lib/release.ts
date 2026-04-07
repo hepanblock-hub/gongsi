@@ -1,4 +1,5 @@
-import releasedCitySitemap from '../data/released-city-sitemap.json';
+import fs from 'node:fs';
+import path from 'node:path';
 import { normalizeStateSlug } from './site';
 
 type ReleasedCityEntry = {
@@ -12,15 +13,25 @@ const STATE_CODE_TO_SLUG: Record<string, string> = {
   CA: 'california',
 };
 
-const RELEASED_CITY_MAP = releasedCitySitemap as ReleasedCityMap;
-const RELEASE_VISIBILITY_VERSION = JSON.stringify(RELEASED_CITY_MAP);
+const RELEASE_FILE = path.join(process.cwd(), 'data', 'released-city-sitemap.json');
+
+function loadReleasedCityMap(): ReleasedCityMap {
+  try {
+    const raw = fs.readFileSync(RELEASE_FILE, 'utf8');
+    const parsed = JSON.parse(raw) as ReleasedCityMap;
+    return parsed ?? {};
+  } catch {
+    return {};
+  }
+}
 
 export function getReleaseVisibilityVersion(): string {
-  return RELEASE_VISIBILITY_VERSION;
+  return JSON.stringify(loadReleasedCityMap());
 }
 
 export function getReleasedCityEntries(stateSlug: string): ReleasedCityEntry[] {
-  return RELEASED_CITY_MAP[normalizeStateSlug(stateSlug)] ?? [];
+  const map = loadReleasedCityMap();
+  return map[normalizeStateSlug(stateSlug)] ?? [];
 }
 
 export function hasReleasedCityControl(stateSlug: string): boolean {
