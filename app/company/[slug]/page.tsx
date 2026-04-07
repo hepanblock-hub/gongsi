@@ -17,6 +17,23 @@ import {
 } from '../../../lib/queries';
 import { companyPathFromSlug, formatDate, formatMoney, normalizeStateSlug, SITE_URL } from '../../../lib/site';
 
+export const revalidate = 86400;
+
+export async function generateStaticParams() {
+  return [
+    'saf-flc-ca',
+    'v-t-tooling-ca',
+    'wellah-aesthetics-med-spa-ca',
+    'wunder-bar-ca',
+    'xbp-global-holdings-ca',
+    'swim-care-pool-services-ca',
+    'r-r-heating-air-conditioning-ca',
+    'guevara-s-painting-ca',
+    'bear-fence-enterprises-ca',
+    'wesco-ca',
+  ].map((slug) => ({ slug }));
+}
+
 const STATE_CODE_TO_NAME: Record<string, string> = {
   AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut',
   DE: 'Delaware', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa',
@@ -101,8 +118,10 @@ function isLikelyRealCompanyName(name: string): boolean {
   if (!trimmed) return false;
   if (/^-?\s*select\s*-?$/i.test(trimmed)) return false;
   if (/^\d+[\w\s-]*$/.test(trimmed)) return false;
-  if (/\b(st|street|ave|avenue|blvd|boulevard|road|rd|drive|dr|suite|ste|apt|unit)\b/i.test(trimmed)) return false;
-  if (/^[A-Z0-9-]{10,}$/.test(trimmed.replace(/\s+/g, ''))) return false;
+  // Only reject actual street addresses that begin with a house number
+  if (/^\d+\s+\w+.*\b(st|street|ave|avenue|blvd|boulevard|road|rd|drive|dr)\b/i.test(trimmed)) return false;
+  // Only reject code-like strings with no spaces (e.g. "ABCD1234XYZ")
+  if (/^[A-Z0-9-]{10,}$/.test(trimmed)) return false;
   return /[A-Za-z]/.test(trimmed);
 }
 
@@ -202,6 +221,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!page) return { title: 'Company not found' };
   const entityLooksReal = isLikelyRealCompanyName(page.company_name);
   const stateName = fullStateName(page.state);
+  const stateCode = Object.entries(STATE_CODE_TO_NAME).find(([, v]) => v === stateName)?.[0] ?? stateName;
   const [osha, licenses, registrations] = await Promise.all([
     getOshaByCompany(page.company_name, page.state, 1),
     getLicensesByCompany(page.company_name, page.state, 1),
@@ -213,27 +233,43 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const hasRegistration = registrations.length > 0;
   const sourceCount = [hasOsha, hasLicense, hasRegistration].filter(Boolean).length;
   const location = page.city ? `${page.city}, ${stateName}` : stateName;
+  const companyName = page.company_name;
 
-  const cityPart = page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`;
+  // Use state abbreviation to keep titles concise
+  const cityPart = page.city ? ` – ${page.city}, ${stateCode}` : ` – ${stateCode}`;
+  const MAX_TITLE_LENGTH = 60;
+  const MAX_NAME_IN_DESCRIPTION = 52;
+  const nameForDescription = companyName.length > MAX_NAME_IN_DESCRIPTION
+    ? companyName.substring(0, MAX_NAME_IN_DESCRIPTION - 1).trim() + '\u2026'
+    : companyName;
 
-  let title = `${page.company_name} – Public Compliance Record${cityPart}`;
-  let description = `View public compliance records for ${page.company_name}${cityPart}. Includes OSHA inspection history, contractor license status, and business registration details from official government sources.`;
+  function composeCompactTitle(suffix: string): string {
+    const reserved = suffix.length;
+    const maxNameLength = Math.max(12, MAX_TITLE_LENGTH - reserved);
+    const compactName = companyName.length > maxNameLength
+      ? companyName.substring(0, maxNameLength - 1).trim() + '\u2026'
+      : companyName;
+    return `${compactName}${suffix}`;
+  }
+
+  let title = composeCompactTitle(` – Public Compliance${cityPart}`);
+  let description = `${nameForDescription}${page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}: OSHA, contractor license, and registration data from official public sources.`;
 
   if (hasOsha && hasLicense && hasRegistration) {
-    title = `${page.company_name} OSHA Violations & License Status${cityPart}`;
-    description = `${page.company_name} OSHA inspection history, contractor license status, and business registration records${cityPart}. Compliance data from official public sources.`;
+    title = composeCompactTitle(` OSHA & License Records${cityPart}`);
+    description = `${nameForDescription}${page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}: OSHA records, contractor license status, and registration data from official sources.`;
   } else if (hasOsha && !hasLicense && !hasRegistration) {
-    title = `${page.company_name} OSHA Inspection Records & Violations${cityPart}`;
-    description = `${page.company_name} OSHA inspection records and workplace safety violation history${cityPart}. View reported incidents and workplace safety compliance data.`;
+    title = composeCompactTitle(` OSHA Inspection Records${cityPart}`);
+    description = `${nameForDescription}${page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}: OSHA inspection records and workplace safety history from official sources.`;
   } else if (!hasOsha && hasLicense && !hasRegistration) {
-    title = `${page.company_name} Contractor License Status${cityPart}`;
-    description = `Check contractor license status for ${page.company_name}${cityPart}. Active, expired, or suspended license records from official state sources.`;
+    title = composeCompactTitle(` Contractor License Status${cityPart}`);
+    description = `Contractor license status for ${nameForDescription}${page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}. Active, expired, or suspended records from official sources.`;
   } else if (!hasOsha && !hasLicense && hasRegistration) {
-    title = `${page.company_name} Business Registration Status${cityPart}`;
-    description = `${page.company_name} business registration status and entity filing records${cityPart}. Public record data from official state sources.`;
+    title = composeCompactTitle(` Business Registration${cityPart}`);
+    description = `${nameForDescription}${page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}: business registration status and entity filing records from official sources.`;
   } else if (sourceCount === 2) {
-    title = `${page.company_name} OSHA & License Compliance Records${cityPart}`;
-    description = `View OSHA inspection history, contractor license status, and compliance records for ${page.company_name}${cityPart}. Data from official public government sources.`;
+    title = composeCompactTitle(` OSHA & Compliance Records${cityPart}`);
+    description = `${nameForDescription}${page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}: OSHA inspection history and compliance records from official public data.`;
   }
 
   return {
@@ -243,6 +279,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     alternates: {
       canonical: page.slug,
     },
+    authors: [{ name: 'Compliance Lookup Editorial Team' }],
+    creator: 'Compliance Lookup Data Team',
+    publisher: 'Compliance Lookup',
   };
 }
 
@@ -383,6 +422,17 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         description={`Public compliance records for ${page.company_name}${page.city ? ` · ${page.city}, ${stateName}` : ` · ${stateName}`}`}
       />
 
+      <SectionCard title="Official verification quick actions">
+        <p>
+          Use this page for screening, then validate with official systems before any legal, hiring, or procurement decision.
+        </p>
+        <ul>
+          {officialVerificationLinks.map((item) => (
+            <li key={`quick-${item.url}`}><a href={item.url} target="_blank" rel="noopener noreferrer">{item.label}</a></li>
+          ))}
+        </ul>
+      </SectionCard>
+
       {!entityLooksReal && (
         <SectionCard title="Entity quality notice">
           <p>
@@ -395,17 +445,10 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
       <SectionCard title="Company description">
         <p>{locationLine}</p>
         <p>{oshaLine}</p>
+        <p>{recordsLine}</p>
         <p>
-          {licenses.length > 0
-            ? `Contractor license records are available for ${page.company_name} in ${stateName}, showing license status as ${latestLicenseStatus}.`
-            : `No active contractor license records were found in the current datasets for ${page.company_name} in ${stateName}.`}
-          {registrations.length > 0
-            ? ` Business registration records are on file, showing registration status as ${latestRegistrationStatus}.`
-            : ' No verified business registration records were identified in the available public data.'}
-        </p>
-        <p>
-          This page provides a detailed overview of OSHA violation history, contractor license status, and compliance records for {page.company_name}
-          {page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}.
+          Screening snapshot: OSHA {osha.length} · License {licenses.length} · Registration {registrations.length}.
+          Use this page to prioritize verification steps before final hiring or vendor decisions.
         </p>
         <p className="muted">{freshnessLine}</p>
       </SectionCard>
@@ -466,10 +509,16 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
             </SectionCard>
           )}
 
-          <SectionCard title="Risk overview">
+          <SectionCard title="Decision guidance">
             <p>{riskIntro}</p>
             <p>{riskFollowUp}</p>
             <p>{riskConclusion}</p>
+            <p>
+              Recommended next step:{' '}
+              {latestLicenseStatus.toLowerCase() === 'active' && registrations.length > 0
+                ? `Complete official verification and keep ${page.company_name} in shortlist.`
+                : `Run manual verification first using ${stateName} official licensing and business registries.`}
+            </p>
             <p><StatusBadge label={osha.length ? 'OSHA inspections present' : 'No OSHA inspections found'} tone={osha.length ? 'warn' : 'good'} /></p>
             <p><StatusBadge label={`Contractor license: ${latestLicenseStatus}`} tone={latestLicenseStatus === 'active' ? 'good' : 'neutral'} /></p>
             <p><StatusBadge label={`Business registration: ${latestRegistrationStatus}`} tone={latestRegistrationStatus === 'active' ? 'good' : 'neutral'} /></p>
@@ -551,55 +600,15 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
             {!registrations.length && <p>No registration records found for this company/state combination.</p>}
           </SectionCard>
 
-          <SectionCard title="Compliance Summary">
+          <SectionCard title="Record interpretation">
             <ul>
-              <li>{osha.length > 0 ? `OSHA inspection records present (${osha.length} records)` : 'No OSHA inspection records found in current data'}</li>
-              <li>{licenses.length > 0 ? `Contractor license records found (${licenses.length}) – status: ${latestLicenseStatus}` : 'No contractor license records found'}</li>
-              <li>{registrations.length > 0 ? `Business registration records found (${registrations.length}) – status: ${latestRegistrationStatus}` : 'No business registration record found'}</li>
+              <li>{osha.length > 0 ? `OSHA inspection records present (${osha.length})` : 'No OSHA inspection records found in current dataset'}</li>
+              <li>{licenses.length > 0 ? `Contractor license status: ${latestLicenseStatus}` : 'No contractor license record found in current dataset'}</li>
+              <li>{registrations.length > 0 ? `Business registration status: ${latestRegistrationStatus}` : 'No business registration record found in current dataset'}</li>
             </ul>
-            <p>Users should verify the company&#39;s current licensing and registration status through official state agencies before making decisions.</p>
-          </SectionCard>
-
-          <SectionCard title="Compliance conclusion">
-            {osha.length > 0 ? (
-              <p>
-                {page.company_name} has {osha.length} recorded OSHA inspection{osha.length > 1 ? 's' : ''}, indicating workplace safety activity
-                {page.city ? ` in ${page.city}, ${stateName}` : ` in ${stateName}`}.
-                {osha.length >= 10 ? ' The volume of inspections may indicate significant operational activity or prior safety incidents.' : ''}
-              </p>
-            ) : (
-              <p>No OSHA inspection records were found in the current public dataset for {page.company_name}.</p>
-            )}
-            {licenses.length === 0 && registrations.length === 0 ? (
-              <p>
-                No confirmed contractor license or business registration was identified in the available records.
-                Users are advised to verify the company&#39;s license status directly with {stateName} state authorities if needed.
-              </p>
-            ) : (
-              <p>
-                Current records indicate contractor license status as <strong>{latestLicenseStatus}</strong> and
-                business registration status as <strong>{latestRegistrationStatus}</strong>.
-                Users are advised to confirm current standing directly with official {stateName} state sources.
-              </p>
-            )}
-          </SectionCard>
-
-          <SectionCard title="About OSHA records and license status">
             <p>
-              OSHA inspection records reflect workplace safety reviews conducted by federal authorities under the
-              Occupational Safety and Health Administration. A higher number of OSHA inspections may indicate
-              increased operational activity or prior workplace safety incidents at a company.
-            </p>
-            <p>
-              Contractor license status is an important compliance factor when evaluating companies in {stateName},
-              especially for construction and other regulated industries. An active license indicates the company
-              meets current state licensing requirements. Expired or suspended license status should be verified
-              through official {stateName} state licensing authorities.
-            </p>
-            <p>
-              Missing or unknown license records in this dataset do not necessarily mean a company is unlicensed.
-              Users are encouraged to cross-reference with the official {stateName} contractor license lookup portal
-              for the most current compliance record information.
+              Interpretation rule: missing records in this dataset should be treated as "not observed" rather than definitive legal absence.
+              Final qualification should be confirmed via official agency systems listed in the Sources section.
             </p>
           </SectionCard>
 
@@ -635,6 +644,16 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
                 <li key={item.url}><a href={item.url} target="_blank" rel="noopener noreferrer">{item.label}</a></li>
               ))}
             </ul>
+          </SectionCard>
+
+          <SectionCard title="Editorial and methodology note">
+            <p>
+              Maintained by the Compliance Lookup Editorial Team. Data is aggregated from official public sources and normalized for screening use.
+              This page is not legal advice and may lag behind real-time agency updates.
+            </p>
+            <p>
+              For YMYL decisions, official agency records are authoritative and should be treated as final source of truth.
+            </p>
           </SectionCard>
         </div>
 

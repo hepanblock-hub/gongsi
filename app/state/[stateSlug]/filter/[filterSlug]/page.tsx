@@ -6,7 +6,18 @@ import SectionCard from '../../../../../components/common/SectionCard';
 import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
 import { stateSlugToName } from '../../../../../lib/site';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 86400;
+
+export async function generateStaticParams() {
+  const filterSlugs = [
+    'quality', 'osha', 'recent', 'active-license',
+    'full', 'partial', 'osha-only', 'license-only', 'registration-only', 'basic',
+    'osha-violations', 'contractor-licenses', 'business-registration',
+    'active-licenses', 'expired-licenses', 'suspended-licenses',
+    'recently-updated', 'full-profiles', 'partial-profiles', 'basic-listings',
+  ];
+  return filterSlugs.map((filterSlug) => ({ stateSlug: 'california', filterSlug }));
+}
 
 const FILTERS = [
   'quality', 'osha', 'recent', 'active-license',
@@ -137,23 +148,23 @@ function filterTitle(filterSlug: FilterSlug, stateName: string): string {
   switch (filterSlug) {
     case 'osha':
     case 'osha-violations':
-      return `${stateName} OSHA Violations by Company`;
+      return `${stateName} OSHA Violations & Inspection Records`;
     case 'license-only':
     case 'contractor-licenses':
-      return `${stateName} Contractor License Lookup`;
+      return `${stateName} Contractor License Lookup & Verification`;
     case 'registration-only':
     case 'business-registration':
       return `${stateName} Business Registration Records`;
     case 'active-license':
     case 'active-licenses':
-      return `${stateName} Active Contractor Licenses`;
+      return `${stateName} Active Contractor License Records`;
     case 'expired-licenses':
-      return `${stateName} Expired Contractor Licenses`;
+      return `${stateName} Expired Contractor License Records`;
     case 'suspended-licenses':
-      return `${stateName} Suspended Contractor Licenses`;
+      return `${stateName} Suspended Contractor License Records`;
     case 'recent':
     case 'recently-updated':
-      return `${stateName} Recently Updated Company Records`;
+      return `${stateName} Recently Updated Company Compliance Records`;
     case 'full':
     case 'full-profiles':
       return `${stateName} Full Company Compliance Profiles`;
@@ -164,7 +175,7 @@ function filterTitle(filterSlug: FilterSlug, stateName: string): string {
     case 'basic-listings':
       return `${stateName} Basic Company Records`;
     case 'quality':
-      return `Top Companies with Quality Compliance Profiles in ${stateName} (2026 Data)`;
+      return `Top ${stateName} Companies with Quality Compliance Profiles`;
     case 'osha-only':
       return `${stateName} OSHA Inspection Records`;
     default: return `${stateName} company records`;
@@ -202,7 +213,7 @@ function filterDescription(filterSlug: FilterSlug, stateName: string): string {
     case 'basic-listings':
       return `Browse basic public company listings in ${stateName} and review available compliance data from official government sources.`;
     case 'quality':
-      return `Browse top companies in ${stateName} ranked by compliance data quality and completeness. Companies are prioritized based on OSHA records, contractor license availability, and registration data coverage from official public sources.`;
+      return `Top ${stateName} companies ranked by compliance data quality. Includes OSHA records, contractor licenses, and registration data from public government sources.`;
     case 'osha-only':
       return `View companies in ${stateName} with OSHA inspection records available from official public sources.`;
     default:
@@ -220,6 +231,9 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
     title: { absolute: title },
     description,
     alternates: { canonical: `/state/${stateSlug}/filter/${filterSlug}` },
+    authors: [{ name: 'Compliance Lookup Editorial Team' }],
+    creator: 'Compliance Lookup Data Team',
+    publisher: 'Compliance Lookup',
   };
 }
 
@@ -294,7 +308,7 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
     companies = companies.sort(compareCompanies);
   }
 
-  if (!companies.length) notFound();
+  const isEmptyResult = companies.length === 0;
 
   const topCompanies = companies.slice(0, 200);
   const decisionStats = topCompanies.reduce(
@@ -307,6 +321,17 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
     },
     { lower: 0, manual: 0, higher: 0 }
   );
+
+  const activeCount = topCompanies.filter((c) => (c.license_status ?? '').toLowerCase() === 'active').length;
+  const suspendedOrRevokedCount = topCompanies.filter((c) => {
+    const s = (c.license_status ?? '').toLowerCase();
+    return s === 'suspended' || s === 'revoked';
+  }).length;
+  const injuryLinkedCount = topCompanies.filter((c) => (c.injury_count ?? 0) > 0).length;
+  const withOshaCount = topCompanies.filter((c) => c.has_osha).length;
+  const withLicenseCount = topCompanies.filter((c) => c.has_license).length;
+  const withRegistrationCount = topCompanies.filter((c) => c.has_registration).length;
+
   const intentCopy = filterIntentCopy(filterSlug, stateName);
 
   return (
@@ -348,6 +373,21 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
         })()}
       />
 
+      <SectionCard title="Direct search first, filter second">
+        <p>
+          Best workflow: if you know a company name, search directly first; if not, use this filtered list for shortlist and triage.
+        </p>
+        <p>
+          <a href={`/search?state=${encodeURIComponent(stateName)}`}>Search in {stateName}</a>
+          {' '}·{' '}
+          <a href={`/state/${stateSlug}/filter/quality`}>Quality ranking</a>
+          {' '}·{' '}
+          <a href={`/state/${stateSlug}/filter/active-licenses`}>Active licenses</a>
+          {' '}·{' '}
+          <a href={`/state/${stateSlug}/filter/osha-violations`}>OSHA-focused</a>
+        </p>
+      </SectionCard>
+
 
       <SectionCard title={intentCopy.title}>
         <p>{intentCopy.intro}</p>
@@ -367,6 +407,70 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
         <p>
           These signals are screening aids based on public records and should not be treated as legal conclusions.
           Always confirm final status with official {stateName} agencies.
+        </p>
+      </SectionCard>
+
+      <SectionCard title="Filter data profile and evidence coverage">
+        <p>
+          Current view: <strong>{companies.length}</strong> matched companies, with <strong>{topCompanies.length}</strong> shown in this page table.
+          Within the displayed set, OSHA coverage appears in <strong>{withOshaCount}</strong> companies,
+          contractor-license coverage in <strong>{withLicenseCount}</strong>, and business-registration coverage in
+          <strong> {withRegistrationCount}</strong>.
+        </p>
+        <p>
+          Active-license signals appear in <strong>{activeCount}</strong> companies, while suspended/revoked signals appear in
+          <strong> {suspendedOrRevokedCount}</strong>. Injury-linked OSHA records appear in <strong>{injuryLinkedCount}</strong> companies.
+          These are practical prioritization indicators for manual due diligence.
+        </p>
+        <p>
+          Interpretation note: this page is a structured public-record snapshot. Missing records in one source should be read as
+          "not observed in current dataset" rather than definitive legal absence. For contract decisions, cross-check final standing with
+          official state portals and source links shown on each company page.
+        </p>
+      </SectionCard>
+
+      {isEmptyResult && (
+        <SectionCard title="No matching companies in current snapshot">
+          <p>
+            No companies currently match this filter in the latest indexed California dataset snapshot.
+            This does not prove legal absence in the real world; it only indicates no matching record in current public-source ingestion.
+          </p>
+          <p>
+            Recommended next step: use broader filters such as quality, contractor-licenses, or osha,
+            then verify final status in official California agency portals before operational decisions.
+          </p>
+        </SectionCard>
+      )}
+
+      <SectionCard title="Recommended verification workflow">
+        <ol>
+          <li>Start from screening signal and open the company detail page.</li>
+          <li>Review OSHA timeline context and incident severity fields.</li>
+          <li>Validate contractor license status and registration status.</li>
+          <li>Confirm legal standing with official {stateName} agency systems before final selection.</li>
+        </ol>
+      </SectionCard>
+
+      <SectionCard title="How to interpret this filtered page correctly">
+        <p>
+          This filtered list is designed for decision support and triage. It helps teams narrow a large set of companies into
+          a practical shortlist, but it should not be treated as a final legal judgment. Public-record coverage can vary by source,
+          publication lag, and agency update cycles.
+        </p>
+        <p>
+          A strong profile in this view means better evidence visibility, not guaranteed suitability for every project.
+          Likewise, a weaker profile often means more manual verification is needed. For best outcomes, combine this filter result
+          with company-level timeline review and direct checks against official {stateName} licensing and registration systems.
+        </p>
+      </SectionCard>
+
+      <SectionCard title="Editorial method and source trust model">
+        <p>
+          This page is curated by the Compliance Lookup Editorial Team and generated from official public records.
+          It is intended for preliminary due diligence, not final legal determination.
+        </p>
+        <p>
+          We recommend a two-step check for YMYL decisions: (1) shortlist using this view, (2) confirm final standing directly with official state agencies.
         </p>
       </SectionCard>
 

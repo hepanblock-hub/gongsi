@@ -6,7 +6,14 @@ import SectionCard from '../../../../../components/common/SectionCard';
 import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
 import { stateSlugToName } from '../../../../../lib/site';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 86400;
+
+export async function generateStaticParams() {
+  const cities = [
+    'los-angeles', 'san-diego', 'san-jose', 'sacramento', 'san-francisco',
+  ];
+  return cities.map((citySlug) => ({ stateSlug: 'california', citySlug }));
+}
 
 function normalizeCityName(value: string | null): string {
   const raw = (value ?? 'Unknown').trim();
@@ -96,9 +103,12 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   const stateName = stateSlugToName(stateSlug);
   const cityName = citySlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   return {
-    title: { absolute: `${cityName} Contractor License Lookup, OSHA Records & Company Compliance Data` },
-    description: `Decision-focused company compliance guide for ${cityName}, ${stateName}. Review OSHA inspection patterns, contractor license status signals, and verification workflow before hiring or vendor selection.`,
+    title: { absolute: `${cityName} Contractor & OSHA Records – ${stateName}` },
+    description: `Check contractor licenses and OSHA inspection records for ${cityName}, ${stateName} companies. Official public compliance data from government sources.`,
     alternates: { canonical: `/state/${stateSlug}/city/${citySlug}` },
+    authors: [{ name: 'Compliance Lookup Editorial Team' }],
+    creator: 'Compliance Lookup Data Team',
+    publisher: 'Compliance Lookup',
   };
 }
 
@@ -125,6 +135,10 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
   const activeLicenseCount = companies.filter((c) => (c.license_status ?? '').toLowerCase() === 'active').length;
   const suspendedLicenseCount = companies.filter((c) => (c.license_status ?? '').toLowerCase() === 'suspended').length;
   const expiredLicenseCount = companies.filter((c) => (c.license_status ?? '').toLowerCase() === 'expired').length;
+  const unknownLicenseCount = companies.filter((c) => {
+    const s = (c.license_status ?? 'unknown').toLowerCase();
+    return !s || s === 'unknown' || s === '-';
+  }).length;
   const injuryLinkedCount = companies.filter((c) => (c.injury_count ?? 0) > 0).length;
 
   const topCompanies = companies.slice(0, 200);
@@ -163,6 +177,19 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
         title={`${cityName}, ${stateName} Contractor License Lookup & OSHA Records`}
         description={`Decision-focused screening page for contractor compliance checks in ${cityName}, ${stateName}`}
       />
+
+      <SectionCard title={`Start with direct company lookup in ${cityName}`}>
+        <p>
+          If you already know the company name, use direct lookup first, then return to this city list for comparison.
+        </p>
+        <p>
+          <a href={`/search?state=${encodeURIComponent(stateName)}&city=${encodeURIComponent(cityName)}`}>Search companies in {cityName}</a>
+          {' '}·{' '}
+          <a href={`/state/${stateSlug}/filter/active-licenses`}>View active-license shortlist</a>
+          {' '}·{' '}
+          <a href={`/state/${stateSlug}/filter/osha-violations`}>View OSHA-focused shortlist</a>
+        </p>
+      </SectionCard>
 
       <SectionCard title={`Compliance records in ${cityName}, ${stateName}`}>
         <p>
@@ -207,10 +234,34 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
         )}
       </SectionCard>
 
-      <SectionCard title="Why checking company compliance matters">
+      <SectionCard title="City-level risk distribution and interpretation">
         <p>
-          Reviewing company compliance records helps reduce risk when hiring contractors or evaluating businesses.
-          OSHA inspection history and licensing status can provide insight into safety practices and regulatory compliance.
+          This {cityName} dataset includes <strong>{companies.length}</strong> indexed companies. Active-license signals appear in
+          <strong> {activeLicenseCount}</strong> entities, while suspended or expired signals appear in
+          <strong> {suspendedLicenseCount + expiredLicenseCount}</strong> entities, and
+          <strong> {unknownLicenseCount}</strong> entities have unknown or missing license status in currently available public records.
+        </p>
+        <p>
+          A higher OSHA count does not automatically mean a company is unsafe; it can also reflect business scale,
+          project volume, or inspection intensity in the local industry. For procurement and hiring decisions,
+          the practical approach is to combine OSHA history with current license standing and registration confirmation.
+        </p>
+        <p>
+          In this city view, injury-linked records are present in <strong>{injuryLinkedCount}</strong> companies.
+          Those records should be prioritized for manual due diligence, especially when paired with suspended,
+          revoked, expired, or unknown license signals.
+        </p>
+      </SectionCard>
+
+      <SectionCard title="How to use this city page for due diligence">
+        <p>
+          Use this page as a screening layer, not as final legal proof. First, shortlist companies with stronger profile coverage
+          (full/partial profiles), then review OSHA timeline context, and finally verify current legal status through official state portals.
+        </p>
+        <p>
+          Recommended workflow: (1) open a company page, (2) check OSHA records and severity context, (3) check contractor license state,
+          (4) check registration status, (5) confirm final standing with state agencies. This sequence reduces false positives and helps
+          avoid decisions based on incomplete snapshots.
         </p>
       </SectionCard>
 
@@ -276,6 +327,16 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
           <li><a href={`/state/${stateSlug}`}>{stateName} OSHA inspection records</a></li>
           <li><a href={`/state/${stateSlug}/cities`}>Browse all cities in {stateName}</a></li>
         </ul>
+      </SectionCard>
+
+      <SectionCard title="Editorial method and accountability">
+        <p>
+          Maintained by the Compliance Lookup Editorial Team. Data is aggregated from official public sources (OSHA, state licensing boards,
+          and Secretary of State systems) and presented as a screening aid.
+        </p>
+        <p>
+          This page is not legal advice and not a real-time agency system. When record conflicts appear, official agency records take precedence.
+        </p>
       </SectionCard>
     </main>
   );

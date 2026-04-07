@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-04-07T05:46:02.163Z",
+  "total": 44,
+  "pass": 41,
+  "fail": 3,
+  "failed": [
+    {
+      "file": "company__guevara-s-painting-ca.json",
+      "routePath": "/company/guevara-s-painting-ca",
+      "type": "company",
+      "status": 200,
+      "titleLen": 65,
+      "descLen": 146,
+      "noindex": false,
+      "words": 841,
+      "jsonLdCount": 4,
+      "pass": false,
+      "errors": [
+        "title"
+      ]
+    },
+    {
+      "file": "company__r-r-heating-air-conditioning-ca.json",
+      "routePath": "/company/r-r-heating-air-conditioning-ca",
+      "type": "company",
+      "status": 200,
+      "titleLen": 68,
+      "descLen": 157,
+      "noindex": false,
+      "words": 843,
+      "jsonLdCount": 4,
+      "pass": false,
+      "errors": [
+        "title"
+      ]
+    },
+    {
+      "file": "search.json",
+      "routePath": "/search",
+      "type": "search",
+      "status": 200,
+      "titleLen": 64,
+      "descLen": 142,
+      "noindex": true,
+      "words": 135,
+      "jsonLdCount": 4,
+      "pass": false,
+      "errors": [
+        "title"
+      ]
+    }
+  ]
+}
