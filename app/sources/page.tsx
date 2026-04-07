@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   alternates: {
     canonical: '/sources',
   },
+  authors: [{ name: 'Compliance Lookup Editorial Team' }],
+  creator: 'Compliance Lookup Data Team',
+  publisher: 'Compliance Lookup',
 };
 
 export default function SourcesPage() {
@@ -50,6 +53,7 @@ export default function SourcesPage() {
 
       <SectionCard title="Coverage notes">
         <p>Coverage is expanding by state and source. If a record is missing, it may not yet be ingested.</p>
+        <p>For data review, authorship, and corrections standards, see <a href="/editorial-policy">Editorial Policy</a>.</p>
       </SectionCard>
     </main>
   );

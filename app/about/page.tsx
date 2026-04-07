@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   title: { absolute: 'About Compliance Lookup | Public Company Records' },
   description: 'Learn what Compliance Lookup does, which public records are included, and how company compliance data is organized and displayed.',
   alternates: { canonical: '/about' },
+  authors: [{ name: 'Compliance Lookup Editorial Team' }],
+  creator: 'Compliance Lookup Data Team',
+  publisher: 'Compliance Lookup',
 };
 
 export default function AboutPage() {
@@ -37,6 +40,7 @@ export default function AboutPage() {
         <p><strong>Update responsibility:</strong> We are responsible for scheduled ingestion, normalization checks, and display integrity for indexed records.</p>
         <p><strong>Correction workflow:</strong> When users report a suspected issue, we require source references, validate against official records, and then update or annotate the affected page.</p>
         <p><strong>Final authority:</strong> Official agency records always override this site when differences exist.</p>
+        <p>See <a href="/editorial-policy">Editorial Policy</a> for authorship, review, and correction standards.</p>
       </SectionCard>
     </main>
   );

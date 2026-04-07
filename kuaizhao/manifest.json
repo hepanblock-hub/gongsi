@@ -1,404 +1,164 @@
 {
-  "generatedAt": "2026-04-07T05:45:28.979Z",
+  "generatedAt": "2026-04-07T06:06:58.649Z",
   "baseUrl": "/",
-  "sourceBaseUrl": "http://localhost:39024",
-  "total": 44,
+  "sourceBaseUrl": "http://localhost:39031",
+  "total": 39,
   "items": [
     {
       "routePath": "/",
-      "file": "kuaizhao/pages/home.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 60,
-      "descriptionLength": 156,
-      "wordCount": 473
+      "error": "fetch failed"
     },
     {
       "routePath": "/about",
-      "file": "kuaizhao/pages/about.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 48,
-      "descriptionLength": 129,
-      "wordCount": 278
+      "error": "fetch failed"
+    },
+    {
+      "routePath": "/editorial-policy",
+      "error": "fetch failed"
     },
     {
       "routePath": "/faq",
-      "file": "kuaizhao/pages/faq.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 53,
-      "descriptionLength": 125,
-      "wordCount": 203
+      "error": "fetch failed"
     },
     {
       "routePath": "/methodology",
-      "file": "kuaizhao/pages/methodology.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 50,
-      "descriptionLength": 125,
-      "wordCount": 281
+      "error": "fetch failed"
     },
     {
       "routePath": "/privacy",
-      "file": "kuaizhao/pages/privacy.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 34,
-      "descriptionLength": 105,
-      "wordCount": 164
+      "error": "fetch failed"
     },
     {
       "routePath": "/terms",
-      "file": "kuaizhao/pages/terms.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 36,
-      "descriptionLength": 118,
-      "wordCount": 152
+      "error": "fetch failed"
     },
     {
       "routePath": "/sources",
-      "file": "kuaizhao/pages/sources.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 59,
-      "descriptionLength": 119,
-      "wordCount": 227
+      "error": "fetch failed"
     },
     {
       "routePath": "/search",
-      "file": "kuaizhao/pages/search.json",
-      "status": 200,
-      "noindex": true,
-      "titleLength": 64,
-      "descriptionLength": 142,
-      "wordCount": 135
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california",
-      "file": "kuaizhao/pages/state__california.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 58,
-      "descriptionLength": 155,
-      "wordCount": 9817
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california/city/los-angeles",
-      "file": "kuaizhao/pages/state__california__city__los-angeles.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 54,
-      "descriptionLength": 149,
-      "wordCount": 5464
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california/city/san-diego",
-      "file": "kuaizhao/pages/state__california__city__san-diego.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 52,
-      "descriptionLength": 147,
-      "wordCount": 4777
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california/city/san-jose",
-      "file": "kuaizhao/pages/state__california__city__san-jose.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 51,
-      "descriptionLength": 146,
-      "wordCount": 3775
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california/city/sacramento",
-      "file": "kuaizhao/pages/state__california__city__sacramento.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 53,
-      "descriptionLength": 148,
-      "wordCount": 3509
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california/city/san-francisco",
-      "file": "kuaizhao/pages/state__california__city__san-francisco.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 56,
-      "descriptionLength": 151,
-      "wordCount": 3156
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california/filter/quality",
-      "file": "kuaizhao/pages/state__california__filter__quality.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 57,
-      "descriptionLength": 157,
-      "wordCount": 5241
-    },
-    {
-      "routePath": "/state/california/filter/osha",
-      "file": "kuaizhao/pages/state__california__filter__osha.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 51,
-      "descriptionLength": 138,
-      "wordCount": 5184
-    },
-    {
-      "routePath": "/state/california/filter/recent",
-      "file": "kuaizhao/pages/state__california__filter__recent.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 54,
-      "descriptionLength": 118,
-      "wordCount": 5152
-    },
-    {
-      "routePath": "/state/california/filter/active-license",
-      "file": "kuaizhao/pages/state__california__filter__active-license.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 44,
-      "descriptionLength": 108,
-      "wordCount": 644
-    },
-    {
-      "routePath": "/state/california/filter/full",
-      "file": "kuaizhao/pages/state__california__filter__full.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 43,
-      "descriptionLength": 127,
-      "wordCount": 640
-    },
-    {
-      "routePath": "/state/california/filter/partial",
-      "file": "kuaizhao/pages/state__california__filter__partial.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 38,
-      "descriptionLength": 126,
-      "wordCount": 1680
-    },
-    {
-      "routePath": "/state/california/filter/osha-only",
-      "file": "kuaizhao/pages/state__california__filter__osha-only.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 34,
-      "descriptionLength": 97,
-      "wordCount": 5193
-    },
-    {
-      "routePath": "/state/california/filter/license-only",
-      "file": "kuaizhao/pages/state__california__filter__license-only.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 55,
-      "descriptionLength": 127,
-      "wordCount": 5643
-    },
-    {
-      "routePath": "/state/california/filter/registration-only",
-      "file": "kuaizhao/pages/state__california__filter__registration-only.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 40,
-      "descriptionLength": 125,
-      "wordCount": 636
-    },
-    {
-      "routePath": "/state/california/filter/basic",
-      "file": "kuaizhao/pages/state__california__filter__basic.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 32,
-      "descriptionLength": 121,
-      "wordCount": 5313
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california/filter/osha-violations",
-      "file": "kuaizhao/pages/state__california__filter__osha-violations.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 51,
-      "descriptionLength": 138,
-      "wordCount": 5184
-    },
-    {
-      "routePath": "/state/california/filter/contractor-licenses",
-      "file": "kuaizhao/pages/state__california__filter__contractor-licenses.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 55,
-      "descriptionLength": 127,
-      "wordCount": 5622
-    },
-    {
-      "routePath": "/state/california/filter/business-registration",
-      "file": "kuaizhao/pages/state__california__filter__business-registration.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 40,
-      "descriptionLength": 125,
-      "wordCount": 636
-    },
-    {
-      "routePath": "/state/california/filter/active-licenses",
-      "file": "kuaizhao/pages/state__california__filter__active-licenses.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 44,
-      "descriptionLength": 108,
-      "wordCount": 644
-    },
-    {
-      "routePath": "/state/california/filter/expired-licenses",
-      "file": "kuaizhao/pages/state__california__filter__expired-licenses.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 45,
-      "descriptionLength": 119,
-      "wordCount": 639
-    },
-    {
-      "routePath": "/state/california/filter/suspended-licenses",
-      "file": "kuaizhao/pages/state__california__filter__suspended-licenses.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 47,
-      "descriptionLength": 121,
-      "wordCount": 639
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california/filter/recently-updated",
-      "file": "kuaizhao/pages/state__california__filter__recently-updated.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 54,
-      "descriptionLength": 118,
-      "wordCount": 5222
+      "error": "fetch failed"
+    },
+    {
+      "routePath": "/state/california/filter/active-licenses",
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california/filter/full-profiles",
-      "file": "kuaizhao/pages/state__california__filter__full-profiles.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 43,
-      "descriptionLength": 127,
-      "wordCount": 640
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california/filter/partial-profiles",
-      "file": "kuaizhao/pages/state__california__filter__partial-profiles.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 38,
-      "descriptionLength": 126,
-      "wordCount": 1681
+      "error": "fetch failed"
+    },
+    {
+      "routePath": "/state/california/filter/osha-only",
+      "error": "fetch failed"
+    },
+    {
+      "routePath": "/state/california/filter/license-only",
+      "error": "fetch failed"
+    },
+    {
+      "routePath": "/state/california/filter/registration-only",
+      "error": "fetch failed"
     },
     {
       "routePath": "/state/california/filter/basic-listings",
-      "file": "kuaizhao/pages/state__california__filter__basic-listings.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 32,
-      "descriptionLength": 121,
-      "wordCount": 5313
+      "error": "fetch failed"
+    },
+    {
+      "routePath": "/state/california/filter/contractor-licenses",
+      "error": "fetch failed"
+    },
+    {
+      "routePath": "/state/california/filter/business-registration",
+      "error": "fetch failed"
+    },
+    {
+      "routePath": "/state/california/filter/expired-licenses",
+      "error": "fetch failed"
+    },
+    {
+      "routePath": "/state/california/filter/suspended-licenses",
+      "error": "fetch failed"
     },
     {
       "routePath": "/company/saf-flc-ca",
-      "file": "kuaizhao/pages/company__saf-flc-ca.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 44,
-      "descriptionLength": 112,
-      "wordCount": 788
+      "error": "fetch failed"
     },
     {
       "routePath": "/company/v-t-tooling-ca",
-      "file": "kuaizhao/pages/company__v-t-tooling-ca.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 55,
-      "descriptionLength": 123,
-      "wordCount": 833
+      "error": "fetch failed"
     },
     {
       "routePath": "/company/wellah-aesthetics-med-spa-ca",
-      "file": "kuaizhao/pages/company__wellah-aesthetics-med-spa-ca.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 59,
-      "descriptionLength": 130,
-      "wordCount": 860
+      "error": "fetch failed"
     },
     {
       "routePath": "/company/wunder-bar-ca",
-      "file": "kuaizhao/pages/company__wunder-bar-ca.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 46,
-      "descriptionLength": 114,
-      "wordCount": 823
+      "error": "fetch failed"
     },
     {
       "routePath": "/company/xbp-global-holdings-ca",
-      "file": "kuaizhao/pages/company__xbp-global-holdings-ca.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 56,
-      "descriptionLength": 124,
-      "wordCount": 843
+      "error": "fetch failed"
     },
     {
       "routePath": "/company/swim-care-pool-services-ca",
-      "file": "kuaizhao/pages/company__swim-care-pool-services-ca.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 60,
-      "descriptionLength": 140,
-      "wordCount": 836
+      "error": "fetch failed"
     },
     {
       "routePath": "/company/r-r-heating-air-conditioning-ca",
-      "file": "kuaizhao/pages/company__r-r-heating-air-conditioning-ca.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 68,
-      "descriptionLength": 157,
-      "wordCount": 843
+      "error": "fetch failed"
     },
     {
       "routePath": "/company/guevara-s-painting-ca",
-      "file": "kuaizhao/pages/company__guevara-s-painting-ca.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 65,
-      "descriptionLength": 146,
-      "wordCount": 841
+      "error": "fetch failed"
     },
     {
       "routePath": "/company/bear-fence-enterprises-ca",
-      "file": "kuaizhao/pages/company__bear-fence-enterprises-ca.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 60,
-      "descriptionLength": 143,
-      "wordCount": 834
+      "error": "fetch failed"
     },
     {
       "routePath": "/company/wesco-ca",
-      "file": "kuaizhao/pages/company__wesco-ca.json",
-      "status": 200,
-      "noindex": false,
-      "titleLength": 39,
-      "descriptionLength": 107,
-      "wordCount": 820
+      "error": "fetch failed"
     }
   ]
 }

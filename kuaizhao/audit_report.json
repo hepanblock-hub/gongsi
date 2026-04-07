@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-04-07T05:46:02.163Z",
-  "total": 44,
-  "pass": 41,
-  "fail": 3,
+  "generatedAt": "2026-04-07T06:06:58.963Z",
+  "total": 45,
+  "pass": 22,
+  "fail": 23,
   "failed": [
     {
       "file": "company__guevara-s-painting-ca.json",
@@ -12,7 +12,7 @@
       "titleLen": 65,
       "descLen": 146,
       "noindex": false,
-      "words": 841,
+      "words": 860,
       "jsonLdCount": 4,
       "pass": false,
       "errors": [
@@ -27,7 +27,7 @@
       "titleLen": 68,
       "descLen": 157,
       "noindex": false,
-      "words": 843,
+      "words": 862,
       "jsonLdCount": 4,
       "pass": false,
       "errors": [
@@ -47,6 +47,386 @@
       "pass": false,
       "errors": [
         "title"
+      ]
+    },
+    {
+      "file": "state__california.json",
+      "routePath": "/state/california",
+      "type": "state",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__city__los-angeles.json",
+      "routePath": "/state/california/city/los-angeles",
+      "type": "city",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__city__sacramento.json",
+      "routePath": "/state/california/city/sacramento",
+      "type": "city",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__city__san-diego.json",
+      "routePath": "/state/california/city/san-diego",
+      "type": "city",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__city__san-francisco.json",
+      "routePath": "/state/california/city/san-francisco",
+      "type": "city",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__city__san-jose.json",
+      "routePath": "/state/california/city/san-jose",
+      "type": "city",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__active-licenses.json",
+      "routePath": "/state/california/filter/active-licenses",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__basic-listings.json",
+      "routePath": "/state/california/filter/basic-listings",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__business-registration.json",
+      "routePath": "/state/california/filter/business-registration",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__contractor-licenses.json",
+      "routePath": "/state/california/filter/contractor-licenses",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__expired-licenses.json",
+      "routePath": "/state/california/filter/expired-licenses",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__full-profiles.json",
+      "routePath": "/state/california/filter/full-profiles",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__license-only.json",
+      "routePath": "/state/california/filter/license-only",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__osha-only.json",
+      "routePath": "/state/california/filter/osha-only",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__osha-violations.json",
+      "routePath": "/state/california/filter/osha-violations",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__partial-profiles.json",
+      "routePath": "/state/california/filter/partial-profiles",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__quality.json",
+      "routePath": "/state/california/filter/quality",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__recently-updated.json",
+      "routePath": "/state/california/filter/recently-updated",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__registration-only.json",
+      "routePath": "/state/california/filter/registration-only",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
+      ]
+    },
+    {
+      "file": "state__california__filter__suspended-licenses.json",
+      "routePath": "/state/california/filter/suspended-licenses",
+      "type": "filter",
+      "status": 500,
+      "titleLen": 0,
+      "descLen": 0,
+      "noindex": false,
+      "words": 0,
+      "jsonLdCount": 0,
+      "pass": false,
+      "errors": [
+        "status!=200",
+        "title",
+        "description",
+        "thin",
+        "jsonld"
       ]
     }
   ]

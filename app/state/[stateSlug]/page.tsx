@@ -4,10 +4,17 @@ import Breadcrumbs from '../../../components/common/Breadcrumbs';
 import PageTitle from '../../../components/common/PageTitle';
 import SectionCard from '../../../components/common/SectionCard';
 import BreadcrumbJsonLd from '../../../components/seo/BreadcrumbJsonLd';
+import { canonicalCityPath, canonicalFilterPath } from '../../../lib/indexing';
 import { getStateCityCounts, getStateCompanyPagesWithCategory, getStateSummary, type StateCompanyCategoryRow } from '../../../lib/queries';
 import { SITE_URL, stateSlugToName } from '../../../lib/site';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 86400;
+
+export async function generateStaticParams() {
+  return [
+    { stateSlug: 'california' },
+  ];
+}
 
 function citySlug(value: string): string {
   return value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -76,11 +83,14 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   const stateName = stateSlugToName(stateSlug);
 
   return {
-    title: { absolute: `${stateName} Contractor License Lookup, OSHA Violations & Company Records` },
+    title: { absolute: `${stateName} Contractor License & OSHA Violation Records` },
     description: `Browse public company compliance records in ${stateName}. Search OSHA inspection history, contractor licenses, and registration status from official sources.`,
     alternates: {
       canonical: `/state/${stateSlug}`,
     },
+    authors: [{ name: 'Compliance Lookup Editorial Team' }],
+    creator: 'Compliance Lookup Data Team',
+    publisher: 'Compliance Lookup',
   };
 }
 
@@ -227,31 +237,31 @@ export default async function StatePage({
 
       <SectionCard title="State filters">
         <p>
-          <a href={`/state/${stateSlug}/quality`}>Best quality first</a> ·{' '}
-          <a href={`/state/${stateSlug}/osha-violations`}>Most OSHA records</a> ·{' '}
-          <a href={`/state/${stateSlug}/recently-updated`}>Recently inspected</a> ·{' '}
-          <a href={`/state/${stateSlug}/active-licenses`}>Active licenses first</a>
+          <a href={canonicalFilterPath(stateSlug, 'quality')}>Best quality first</a> ·{' '}
+          <a href={canonicalFilterPath(stateSlug, 'osha-violations')}>Most OSHA records</a> ·{' '}
+          <a href={canonicalFilterPath(stateSlug, 'recently-updated')}>Recently inspected</a> ·{' '}
+          <a href={canonicalFilterPath(stateSlug, 'active-licenses')}>Active licenses first</a>
         </p>
         <p>
-          <a href={`/state/${stateSlug}/full-profiles`}>Full profile</a> ·{' '}
-          <a href={`/state/${stateSlug}/partial-profiles`}>Partial profile</a> ·{' '}
-          <a href={`/state/${stateSlug}/osha-only`}>OSHA only</a> ·{' '}
-          <a href={`/state/${stateSlug}/contractor-licenses`}>License only</a> ·{' '}
-          <a href={`/state/${stateSlug}/business-registration`}>Registration only</a> ·{' '}
-          <a href={`/state/${stateSlug}/basic-listings`}>Basic listing</a>
+          <a href={canonicalFilterPath(stateSlug, 'full-profiles')}>Full profile</a> ·{' '}
+          <a href={canonicalFilterPath(stateSlug, 'partial-profiles')}>Partial profile</a> ·{' '}
+          <a href={canonicalFilterPath(stateSlug, 'osha-only')}>OSHA only</a> ·{' '}
+          <a href={canonicalFilterPath(stateSlug, 'contractor-licenses')}>License only</a> ·{' '}
+          <a href={canonicalFilterPath(stateSlug, 'business-registration')}>Registration only</a> ·{' '}
+          <a href={canonicalFilterPath(stateSlug, 'basic-listings')}>Basic listing</a>
         </p>
       </SectionCard>
 
       <SectionCard title="Browse by category">
         <p>
-          <a href={`/state/${stateSlug}/osha-violations#company-list`}>Top companies with OSHA violations in {summary.state}</a> ·{' '}
-          <a href={`/state/${stateSlug}/recently-updated#company-list`}>Recently inspected companies in {summary.state}</a> ·{' '}
-          <a href={`/state/${stateSlug}/active-licenses#company-list`}>Contractors with active licenses in {summary.state}</a>
+          <a href={`${canonicalFilterPath(stateSlug, 'osha-violations')}#company-list`}>Top companies with OSHA violations in {summary.state}</a> ·{' '}
+          <a href={`${canonicalFilterPath(stateSlug, 'recently-updated')}#company-list`}>Recently inspected companies in {summary.state}</a> ·{' '}
+          <a href={`${canonicalFilterPath(stateSlug, 'active-licenses')}#company-list`}>Contractors with active licenses in {summary.state}</a>
         </p>
         <p>
-          <a href={`/state/${stateSlug}/full-profiles#company-list`}>View all OSHA company records →</a> ·{' '}
-          <a href={`/state/${stateSlug}/contractor-licenses#company-list`}>View all contractor license records →</a> ·{' '}
-          <a href={`/state/${stateSlug}/business-registration#company-list`}>View all business registration records →</a>
+          <a href={`${canonicalFilterPath(stateSlug, 'full-profiles')}#company-list`}>View all OSHA company records →</a> ·{' '}
+          <a href={`${canonicalFilterPath(stateSlug, 'contractor-licenses')}#company-list`}>View all contractor license records →</a> ·{' '}
+          <a href={`${canonicalFilterPath(stateSlug, 'business-registration')}#company-list`}>View all business registration records →</a>
         </p>
       </SectionCard>
 
@@ -278,12 +288,22 @@ export default async function StatePage({
         </p>
       </SectionCard>
 
+      <SectionCard title={`${summary.state} evidence fingerprint`}>
+        <p>
+          Indexed companies: <strong>{summary.company_count}</strong> · OSHA-linked: <strong>{categoryCount.full + categoryCount.partial + categoryCount.oshaOnly}</strong> ·
+          License-linked: <strong>{categoryCount.full + categoryCount.partial + categoryCount.licenseOnly}</strong> · Registration-linked: <strong>{categoryCount.full + categoryCount.partial + categoryCount.registrationOnly}</strong>
+        </p>
+        <p>
+          This state page is differentiated by actual source coverage mix, top-city distribution, and company-profile composition rather than city-name substitution alone.
+        </p>
+      </SectionCard>
+
       <SectionCard title="Top cities">
         <p>Top cities by indexed company count in {summary.state} (showing top 30):</p>
         <p>
           {cityCounts.slice(0, 30).map((g, idx) => (
             <span key={g.city}>
-              <a href={`/state/${stateSlug}/cities/${citySlug(g.city)}#company-list`}>{g.city}</a> ({g.company_count})
+              <a href={`${canonicalCityPath(stateSlug, citySlug(g.city))}#company-list`}>{g.city}</a> ({g.company_count})
               {idx < Math.min(cityCounts.length, 30) - 1 ? ' · ' : ''}
             </span>
           ))}
@@ -331,7 +351,7 @@ export default async function StatePage({
                   {profileLabel(categoryOfCompany(c))}
                 </li>
               ))}
-              <li><a href={`/state/${stateSlug}/cities/${citySlug(g.name)}#company-list`}>View all companies in {g.name} →</a></li>
+              <li><a href={`${canonicalCityPath(stateSlug, citySlug(g.name))}#company-list`}>View all companies in {g.name} →</a></li>
             </ul>
           </details>
         ))}
@@ -346,6 +366,15 @@ export default async function StatePage({
         <p>Source: OSHA official records</p>
         <p>Source: State contractor license boards</p>
         <p>Source: Secretary of State business records</p>
+      </SectionCard>
+
+      <SectionCard title="Editorial and verification note">
+        <p>
+          Maintained by the Compliance Lookup Editorial Team. This page aggregates official public records for screening and research use.
+        </p>
+        <p>
+          Final legal standing should always be confirmed through official agency systems. Related trust pages: <a href="/sources">Sources</a> · <a href="/methodology">Methodology</a> · <a href="/editorial-policy">Editorial Policy</a>
+        </p>
       </SectionCard>
 
       <SectionCard title="FAQ">

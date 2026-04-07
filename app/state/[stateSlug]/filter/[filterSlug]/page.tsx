@@ -1,31 +1,19 @@
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import Breadcrumbs from '../../../../../components/common/Breadcrumbs';
 import PageTitle from '../../../../../components/common/PageTitle';
 import SectionCard from '../../../../../components/common/SectionCard';
+import { FILTER_CANONICAL_MAP, canonicalFilterPath, canonicalFilterSlug, isPrimaryFilterSlug, PRIMARY_FILTER_SLUGS } from '../../../../../lib/indexing';
 import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
 import { stateSlugToName } from '../../../../../lib/site';
 
 export const revalidate = 86400;
 
 export async function generateStaticParams() {
-  const filterSlugs = [
-    'quality', 'osha', 'recent', 'active-license',
-    'full', 'partial', 'osha-only', 'license-only', 'registration-only', 'basic',
-    'osha-violations', 'contractor-licenses', 'business-registration',
-    'active-licenses', 'expired-licenses', 'suspended-licenses',
-    'recently-updated', 'full-profiles', 'partial-profiles', 'basic-listings',
-  ];
-  return filterSlugs.map((filterSlug) => ({ stateSlug: 'california', filterSlug }));
+  return PRIMARY_FILTER_SLUGS.map((filterSlug) => ({ stateSlug: 'california', filterSlug }));
 }
 
-const FILTERS = [
-  'quality', 'osha', 'recent', 'active-license',
-  'full', 'partial', 'osha-only', 'license-only', 'registration-only', 'basic',
-  'osha-violations', 'contractor-licenses', 'business-registration',
-  'active-licenses', 'expired-licenses', 'suspended-licenses',
-  'recently-updated', 'full-profiles', 'partial-profiles', 'basic-listings',
-] as const;
+const FILTERS = Object.keys(FILTER_CANONICAL_MAP) as Array<keyof typeof FILTER_CANONICAL_MAP>;
 
 type FilterSlug = (typeof FILTERS)[number];
 
@@ -38,7 +26,7 @@ function isEncodedCompanyName(name: string): boolean {
   return /^[0-9]/.test(name) || /^[A-Z0-9-]{10,}$/.test(compact) || /\d{3,}/.test(compact);
 }
 
-function categoryOfCompany(c: StateCompanyCategoryRow): FilterSlug | 'other' {
+function categoryOfCompany(c: StateCompanyCategoryRow): string {
   const sources = [c.has_osha, c.has_license, c.has_registration].filter(Boolean).length;
   if (sources === 3) return 'full';
   if (c.has_osha && !c.has_license && !c.has_registration) return 'osha-only';
@@ -94,7 +82,7 @@ function getDecisionNote(c: StateCompanyCategoryRow, stateName: string): string 
   return 'Insufficient public data. Perform manual verification before decisions.';
 }
 
-function filterIntentCopy(filterSlug: FilterSlug, stateName: string): { title: string; intro: string; bullets: string[] } {
+function filterIntentCopy(filterSlug: string, stateName: string): { title: string; intro: string; bullets: string[] } {
   switch (filterSlug) {
     case 'quality':
       return {
@@ -144,7 +132,7 @@ function filterIntentCopy(filterSlug: FilterSlug, stateName: string): { title: s
   }
 }
 
-function filterTitle(filterSlug: FilterSlug, stateName: string): string {
+function filterTitle(filterSlug: string, stateName: string): string {
   switch (filterSlug) {
     case 'osha':
     case 'osha-violations':
@@ -182,7 +170,7 @@ function filterTitle(filterSlug: FilterSlug, stateName: string): string {
   }
 }
 
-function filterDescription(filterSlug: FilterSlug, stateName: string): string {
+function filterDescription(filterSlug: string, stateName: string): string {
   switch (filterSlug) {
     case 'osha':
     case 'osha-violations':
@@ -223,14 +211,15 @@ function filterDescription(filterSlug: FilterSlug, stateName: string): string {
 
 export async function generateMetadata({ params }: { params: Promise<{ stateSlug: string; filterSlug: string }> }): Promise<Metadata> {
   const { stateSlug, filterSlug } = await params;
+  const normalizedFilterSlug = canonicalFilterSlug(filterSlug);
   const stateName = stateSlugToName(stateSlug);
-  const title = isFilterSlug(filterSlug) ? filterTitle(filterSlug, stateName) : `${stateName} company records`;
-  const description = isFilterSlug(filterSlug) ? filterDescription(filterSlug, stateName) : `Browse public company compliance records in ${stateName}.`;
+  const title = isPrimaryFilterSlug(normalizedFilterSlug) ? filterTitle(normalizedFilterSlug, stateName) : `${stateName} company records`;
+  const description = isPrimaryFilterSlug(normalizedFilterSlug) ? filterDescription(normalizedFilterSlug, stateName) : `Browse public company compliance records in ${stateName}.`;
 
   return {
     title: { absolute: title },
     description,
-    alternates: { canonical: `/state/${stateSlug}/filter/${filterSlug}` },
+    alternates: { canonical: canonicalFilterPath(stateSlug, normalizedFilterSlug) },
     authors: [{ name: 'Compliance Lookup Editorial Team' }],
     creator: 'Compliance Lookup Data Team',
     publisher: 'Compliance Lookup',
@@ -239,66 +228,53 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
 
 export default async function StateFilterPage({ params }: { params: Promise<{ stateSlug: string; filterSlug: string }> }) {
   const { stateSlug, filterSlug } = await params;
-  if (!isFilterSlug(filterSlug)) notFound();
+  const normalizedFilterSlug = canonicalFilterSlug(filterSlug);
+  if (!isPrimaryFilterSlug(normalizedFilterSlug)) notFound();
+  if (normalizedFilterSlug !== filterSlug) {
+    permanentRedirect(canonicalFilterPath(stateSlug, normalizedFilterSlug) as never);
+  }
 
   const stateName = stateSlugToName(stateSlug);
   let companies = await getStateCompanyPagesWithCategory(stateSlug, 5000);
 
-  if (filterSlug === 'full' || filterSlug === 'partial' || filterSlug === 'osha-only' || filterSlug === 'license-only' || filterSlug === 'registration-only' || filterSlug === 'basic') {
-    companies = companies.filter((c) => categoryOfCompany(c) === filterSlug);
+  if (normalizedFilterSlug === 'full-profiles' || normalizedFilterSlug === 'partial-profiles' || normalizedFilterSlug === 'osha-only' || normalizedFilterSlug === 'license-only' || normalizedFilterSlug === 'registration-only' || normalizedFilterSlug === 'basic-listings') {
+    const categoryTarget = normalizedFilterSlug === 'full-profiles'
+      ? 'full'
+      : normalizedFilterSlug === 'partial-profiles'
+        ? 'partial'
+        : normalizedFilterSlug === 'basic-listings'
+          ? 'basic'
+          : normalizedFilterSlug;
+    companies = companies.filter((c) => categoryOfCompany(c) === categoryTarget);
   }
 
-  if (filterSlug === 'full-profiles') {
-    companies = companies.filter((c) => categoryOfCompany(c) === 'full');
-  }
-
-  if (filterSlug === 'partial-profiles') {
-    companies = companies.filter((c) => categoryOfCompany(c) === 'partial');
-  }
-
-  if (filterSlug === 'basic-listings') {
-    companies = companies.filter((c) => categoryOfCompany(c) === 'basic');
-  }
-
-  if (filterSlug === 'contractor-licenses') {
+  if (normalizedFilterSlug === 'contractor-licenses') {
     companies = companies.filter((c) => c.has_license);
   }
 
-  if (filterSlug === 'business-registration') {
+  if (normalizedFilterSlug === 'business-registration') {
     companies = companies.filter((c) => c.has_registration);
   }
 
-  if (filterSlug === 'osha-violations') {
+  if (normalizedFilterSlug === 'osha-violations') {
     companies = companies.filter((c) => c.has_osha);
   }
 
-  if (filterSlug === 'active-license') {
+  if (normalizedFilterSlug === 'active-licenses') {
     companies = companies.filter((c) => (c.license_status ?? '').toLowerCase() === 'active');
   }
 
-  if (filterSlug === 'active-licenses') {
-    companies = companies.filter((c) => (c.license_status ?? '').toLowerCase() === 'active');
-  }
-
-  if (filterSlug === 'expired-licenses') {
+  if (normalizedFilterSlug === 'expired-licenses') {
     companies = companies.filter((c) => (c.license_status ?? '').toLowerCase() === 'expired');
   }
 
-  if (filterSlug === 'suspended-licenses') {
+  if (normalizedFilterSlug === 'suspended-licenses') {
     companies = companies.filter((c) => (c.license_status ?? '').toLowerCase() === 'suspended');
   }
 
-  if (filterSlug === 'osha') {
+  if (normalizedFilterSlug === 'osha-violations') {
     companies = companies.sort((a, b) => (b.osha_count || 0) - (a.osha_count || 0) || compareCompanies(a, b));
-  } else if (filterSlug === 'osha-violations') {
-    companies = companies.sort((a, b) => (b.osha_count || 0) - (a.osha_count || 0) || compareCompanies(a, b));
-  } else if (filterSlug === 'recent') {
-    companies = companies.sort((a, b) => {
-      const recentA = a.latest_inspection_date ? new Date(a.latest_inspection_date).getTime() : 0;
-      const recentB = b.latest_inspection_date ? new Date(b.latest_inspection_date).getTime() : 0;
-      return recentB - recentA || compareCompanies(a, b);
-    });
-  } else if (filterSlug === 'recently-updated') {
+  } else if (normalizedFilterSlug === 'recently-updated') {
     companies = companies.sort((a, b) => {
       const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
       const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
@@ -332,7 +308,7 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
   const withLicenseCount = topCompanies.filter((c) => c.has_license).length;
   const withRegistrationCount = topCompanies.filter((c) => c.has_registration).length;
 
-  const intentCopy = filterIntentCopy(filterSlug, stateName);
+  const intentCopy = filterIntentCopy(normalizedFilterSlug, stateName);
 
   return (
     <main className="container">
@@ -345,7 +321,7 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
       />
 
       <PageTitle
-        title={filterTitle(filterSlug, stateName)}
+        title={filterTitle(normalizedFilterSlug, stateName)}
         description={(() => {
           const descriptions: Record<string, string> = {
             'quality': 'Companies ranked by compliance data completeness and recency',
@@ -369,7 +345,7 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
             'basic-listings': 'Basic company records',
             'osha-only': 'OSHA inspection records only',
           };
-          return descriptions[filterSlug as string] || 'Filtered company records';
+          return descriptions[normalizedFilterSlug as string] || 'Filtered company records';
         })()}
       />
 
@@ -380,11 +356,11 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
         <p>
           <a href={`/search?state=${encodeURIComponent(stateName)}`}>Search in {stateName}</a>
           {' '}·{' '}
-          <a href={`/state/${stateSlug}/filter/quality`}>Quality ranking</a>
+          <a href={canonicalFilterPath(stateSlug, 'quality')}>Quality ranking</a>
           {' '}·{' '}
-          <a href={`/state/${stateSlug}/filter/active-licenses`}>Active licenses</a>
+          <a href={canonicalFilterPath(stateSlug, 'active-licenses')}>Active licenses</a>
           {' '}·{' '}
-          <a href={`/state/${stateSlug}/filter/osha-violations`}>OSHA-focused</a>
+          <a href={canonicalFilterPath(stateSlug, 'osha-violations')}>OSHA-focused</a>
         </p>
       </SectionCard>
 

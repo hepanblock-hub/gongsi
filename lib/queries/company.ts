@@ -82,6 +82,36 @@ export async function getRecentCompanyPages(limit = 30): Promise<RecentCompanyRo
   });
 }
 
+export async function countIndexableCompanies(): Promise<number> {
+  return queryWithSnapshot('query_countIndexableCompanies', {}, async () => {
+    const { rows } = await pool.query<{ total: string }>(
+      `SELECT COUNT(*)::text AS total
+       FROM company_pages cp
+       WHERE cp.company_name ~* '[A-Za-z]'
+         AND lower(trim(cp.company_name)) <> '- select -'`
+    );
+
+    return Number(rows[0]?.total ?? 0);
+  });
+}
+
+export async function getCompanySitemapBatch(offset = 0, limit = 5000): Promise<Array<{ slug: string; updated_at: string | null }>> {
+  return queryWithSnapshot('query_getCompanySitemapBatch', { offset, limit }, async () => {
+    const { rows } = await pool.query<{ slug: string; updated_at: string | null }>(
+      `SELECT cp.slug, cp.updated_at::text
+       FROM company_pages cp
+       WHERE cp.company_name ~* '[A-Za-z]'
+         AND lower(trim(cp.company_name)) <> '- select -'
+       ORDER BY cp.id ASC
+       OFFSET $1
+       LIMIT $2`,
+      [offset, limit]
+    );
+
+    return rows;
+  });
+}
+
 export async function getCompanyBySlug(slug: string): Promise<CompanyPageRow | null> {
   return queryWithSnapshot('query_getCompanyBySlug', { slug }, async () => {
     const { rows } = await pool.query<CompanyPageRow>(

@@ -5,6 +5,7 @@ import PageTitle from '../../../components/common/PageTitle';
 import SectionCard from '../../../components/common/SectionCard';
 import StatusBadge from '../../../components/common/StatusBadge';
 import BreadcrumbJsonLd from '../../../components/seo/BreadcrumbJsonLd';
+import { canonicalFilterPath } from '../../../lib/indexing';
 import {
   getCityComplianceBenchmark,
   getCompanyDetailedLocation,
@@ -653,6 +654,17 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
             </p>
             <p>
               For YMYL decisions, official agency records are authoritative and should be treated as final source of truth.
+            </p>
+          </SectionCard>
+
+          <SectionCard title="Explore related index views">
+            <p>
+              <a href={`/state/${normalizeStateSlug(page.state)}`}>State overview</a>
+              {page.city ? ` · ` : ''}
+              {page.city ? <a href={`/state/${normalizeStateSlug(page.state)}/city/${toCitySlug(page.city)}`}>City screening page</a> : null}
+              {' '}· <a href={canonicalFilterPath(normalizeStateSlug(page.state), 'quality')}>Quality ranking</a>
+              {' '}· <a href={canonicalFilterPath(normalizeStateSlug(page.state), 'active-licenses')}>Active licenses</a>
+              {' '}· <a href={canonicalFilterPath(normalizeStateSlug(page.state), 'osha-violations')}>OSHA records</a>
             </p>
           </SectionCard>
         </div>

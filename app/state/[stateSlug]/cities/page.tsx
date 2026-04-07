@@ -21,6 +21,9 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
     alternates: {
       canonical: `/state/${stateSlug}/cities`,
     },
+    authors: [{ name: 'Compliance Lookup Editorial Team' }],
+    creator: 'Compliance Lookup Data Team',
+    publisher: 'Compliance Lookup',
   };
 }
 
@@ -63,11 +66,20 @@ export default async function StateCitiesPage({
               <tr key={row.city}>
                 <td>{row.city}</td>
                 <td>{row.company_count}</td>
-                <td><a href={`/state/${stateSlug}/cities/${citySlug(row.city)}#company-list`}>View companies</a></td>
+                <td><a href={`/state/${stateSlug}/city/${citySlug(row.city)}#company-list`}>View companies</a></td>
               </tr>
             ))}
           </tbody>
         </table>
+      </SectionCard>
+
+      <SectionCard title="How to use this city index">
+        <p>
+          Use this page to jump into city-level screening, then open individual company pages for OSHA, license, and registration evidence.
+        </p>
+        <p>
+          Related pages: <a href={`/state/${stateSlug}`}>{stateName} overview</a> · <a href={`/state/${stateSlug}/filter/quality`}>Quality ranking</a> · <a href={`/state/${stateSlug}/filter/active-licenses`}>Active licenses</a>
+        </p>
       </SectionCard>
     </main>
   );

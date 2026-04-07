@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   alternates: {
     canonical: '/methodology',
   },
+  authors: [{ name: 'Compliance Lookup Editorial Team' }],
+  creator: 'Compliance Lookup Data Team',
+  publisher: 'Compliance Lookup',
 };
 
 export default function MethodologyPage() {
@@ -48,6 +51,7 @@ export default function MethodologyPage() {
       <SectionCard title="Quality control and correction handling">
         <p>Quality checks include duplicate control, date validity checks, null-value handling, and normalization consistency.</p>
         <p>Reported issues are triaged, source-verified, and resolved through a tracked correction process with data re-run when required.</p>
+        <p>Related trust documents: <a href="/sources">Sources</a> · <a href="/editorial-policy">Editorial Policy</a></p>
       </SectionCard>
     </main>
   );
