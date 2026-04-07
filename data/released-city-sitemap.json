@@ -27,6 +27,14 @@
     {
       "name": "Fresno",
       "slug": "fresno"
+    },
+    {
+      "name": "Riverside",
+      "slug": "riverside"
+    },
+    {
+      "name": "Anaheim",
+      "slug": "anaheim"
     }
   ]
 }
