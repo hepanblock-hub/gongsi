@@ -1,4 +1,5 @@
 import { pool } from '../db';
+import { queryWithSnapshot } from '../snapshotQuery';
 import { normalizeStateSlug, stateSlugToName } from '../site';
 import type { CompanyPageRow } from './types';
 
@@ -80,8 +81,9 @@ function normalizeCityForUi(rawCity: string): string {
 export async function getStateCompanyPages(stateSlug: string, limit = 200): Promise<CompanyPageRow[]> {
   const stateName = stateSlugToName(stateSlug);
   const stateCode = STATE_NAME_TO_CODE[stateName.toLowerCase()] ?? '';
-  const { rows } = await pool.query<CompanyPageRow>(
-    `SELECT slug, company_name, state, city, updated_at::text
+  return queryWithSnapshot('query_getStateCompanyPages', { stateSlug, limit }, async () => {
+    const { rows } = await pool.query<CompanyPageRow>(
+      `SELECT slug, company_name, state, city, updated_at::text
      FROM company_pages
      WHERE company_name ~* '[A-Za-z]'
        AND lower(trim(company_name)) <> '- select -'
@@ -92,16 +94,18 @@ export async function getStateCompanyPages(stateSlug: string, limit = 200): Prom
        )
      ORDER BY company_name ASC
      LIMIT $4`,
-    [normalizeStateSlug(stateSlug), stateName, stateCode, limit]
-  );
-  return rows;
+      [normalizeStateSlug(stateSlug), stateName, stateCode, limit]
+    );
+    return rows;
+  });
 }
 
 export async function getStateCompanyPagesWithCategory(stateSlug: string, limit = 5000): Promise<StateCompanyCategoryRow[]> {
   const stateName = stateSlugToName(stateSlug);
   const stateCode = STATE_NAME_TO_CODE[stateName.toLowerCase()] ?? '';
-  const { rows } = await pool.query<StateCompanyCategoryRow>(
-    `SELECT
+  return queryWithSnapshot('query_getStateCompanyPagesWithCategory', { stateSlug, limit }, async () => {
+    const { rows } = await pool.query<StateCompanyCategoryRow>(
+      `SELECT
         cp.slug,
         cp.company_name,
         cp.state,
@@ -164,10 +168,11 @@ export async function getStateCompanyPagesWithCategory(stateSlug: string, limit 
        )
      ORDER BY cp.company_name ASC
      LIMIT $4`,
-    [normalizeStateSlug(stateSlug), stateName, stateCode, limit]
-  );
+      [normalizeStateSlug(stateSlug), stateName, stateCode, limit]
+    );
 
-  return rows;
+    return rows;
+  });
 }
 
 export async function getStateSummary(stateSlug: string): Promise<{
@@ -179,14 +184,15 @@ export async function getStateSummary(stateSlug: string): Promise<{
 }> {
   const stateName = stateSlugToName(stateSlug);
   const stateCode = STATE_NAME_TO_CODE[stateName.toLowerCase()] ?? '';
-  const { rows } = await pool.query<{
+  return queryWithSnapshot('query_getStateSummary', { stateSlug }, async () => {
+    const { rows } = await pool.query<{
     state: string;
     company_count: string;
     osha_count: string;
     license_count: string;
     registration_count: string;
   }>(
-    `SELECT
+      `SELECT
         COALESCE(MAX(cp.state), $2) AS state,
         COUNT(DISTINCT cp.slug) AS company_count,
         (
@@ -218,16 +224,17 @@ export async function getStateSummary(stateSlug: string): Promise<{
         OR lower(cp.state) = lower($2)
         OR lower(cp.state) = lower($3)
        )`,
-    [normalizeStateSlug(stateSlug), stateName, stateCode]
-  );
+      [normalizeStateSlug(stateSlug), stateName, stateCode]
+    );
 
-  return {
-    state: rows[0]?.state ?? stateName,
-    company_count: Number(rows[0]?.company_count ?? 0),
-    osha_count: Number(rows[0]?.osha_count ?? 0),
-    license_count: Number(rows[0]?.license_count ?? 0),
-    registration_count: Number(rows[0]?.registration_count ?? 0),
-  };
+    return {
+      state: rows[0]?.state ?? stateName,
+      company_count: Number(rows[0]?.company_count ?? 0),
+      osha_count: Number(rows[0]?.osha_count ?? 0),
+      license_count: Number(rows[0]?.license_count ?? 0),
+      registration_count: Number(rows[0]?.registration_count ?? 0),
+    };
+  });
 }
 
 export async function getStateCityCounts(stateSlug: string, limit?: number): Promise<StateCityCountRow[]> {
@@ -239,8 +246,9 @@ export async function getStateCityCounts(stateSlug: string, limit?: number): Pro
     ? [normalizeStateSlug(stateSlug), stateName, stateCode, limit]
     : [normalizeStateSlug(stateSlug), stateName, stateCode];
 
-  const { rows } = await pool.query<{ city: string; company_count: string }>(
-    `SELECT
+  return queryWithSnapshot('query_getStateCityCounts', { stateSlug, limit: limit ?? null }, async () => {
+    const { rows } = await pool.query<{ city: string; company_count: string }>(
+      `SELECT
         CASE
           WHEN trim(coalesce(cp.city, '')) = '' THEN 'Unknown'
           ELSE initcap(lower(trim(cp.city)))
@@ -258,43 +266,46 @@ export async function getStateCityCounts(stateSlug: string, limit?: number): Pro
      ORDER BY COUNT(*) DESC, city ASC
        ${limitClause}`,
       params
-  );
+    );
 
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    const city = normalizeCityForUi(row.city);
-    if (city === 'Unknown') continue;
-    counts.set(city, (counts.get(city) ?? 0) + Number(row.company_count));
-  }
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      const city = normalizeCityForUi(row.city);
+      if (city === 'Unknown') continue;
+      counts.set(city, (counts.get(city) ?? 0) + Number(row.company_count));
+    }
 
-  return Array.from(counts.entries())
-    .map(([city, company_count]) => ({ city, company_count }))
-    .sort((a, b) => b.company_count - a.company_count || a.city.localeCompare(b.city))
-    .slice(0, typeof limit === 'number' && limit > 0 ? limit : Number.MAX_SAFE_INTEGER);
+    return Array.from(counts.entries())
+      .map(([city, company_count]) => ({ city, company_count }))
+      .sort((a, b) => b.company_count - a.company_count || a.city.localeCompare(b.city))
+      .slice(0, typeof limit === 'number' && limit > 0 ? limit : Number.MAX_SAFE_INTEGER);
+  });
 }
 
 export async function getIndexedStateSlugs(): Promise<string[]> {
-  const { rows } = await pool.query<{ state: string; company_count: string }>(
-    `SELECT trim(state) AS state, COUNT(*)::text AS company_count
+  return queryWithSnapshot('query_getIndexedStateSlugs', {}, async () => {
+    const { rows } = await pool.query<{ state: string; company_count: string }>(
+      `SELECT trim(state) AS state, COUNT(*)::text AS company_count
      FROM company_pages
      WHERE company_name ~* '[A-Za-z]'
        AND lower(trim(company_name)) <> '- select -'
        AND trim(coalesce(state, '')) <> ''
      GROUP BY 1`
-  );
+    );
 
-  const countsBySlug = new Map<string, number>();
-  for (const row of rows) {
-    const slug = canonicalStateSlug(row.state);
-    if (!slug) continue;
-    const count = Number(row.company_count || 0);
-    countsBySlug.set(slug, (countsBySlug.get(slug) ?? 0) + count);
-  }
+    const countsBySlug = new Map<string, number>();
+    for (const row of rows) {
+      const slug = canonicalStateSlug(row.state);
+      if (!slug) continue;
+      const count = Number(row.company_count || 0);
+      countsBySlug.set(slug, (countsBySlug.get(slug) ?? 0) + count);
+    }
 
-  return Array.from(countsBySlug.entries())
-    .filter(([, count]) => count >= MIN_INDEXED_STATE_COMPANY_COUNT)
-    .map(([slug]) => slug)
-    .sort();
+    return Array.from(countsBySlug.entries())
+      .filter(([, count]) => count >= MIN_INDEXED_STATE_COMPANY_COUNT)
+      .map(([slug]) => slug)
+      .sort();
+  });
 }
 
 export async function getIndexedStates(): Promise<Array<{ slug: string; name: string }>> {
@@ -303,10 +314,11 @@ export async function getIndexedStates(): Promise<Array<{ slug: string; name: st
 }
 
 export async function getIndexedStateCitiesMap(): Promise<Record<string, string[]>> {
-  const allowedStates = new Set(await getIndexedStateSlugs());
+  return queryWithSnapshot('query_getIndexedStateCitiesMap', {}, async () => {
+    const allowedStates = new Set(await getIndexedStateSlugs());
 
-  const { rows } = await pool.query<{ state: string; city: string }>(
-    `SELECT
+    const { rows } = await pool.query<{ state: string; city: string }>(
+      `SELECT
         trim(cp.state) AS state,
         CASE
           WHEN trim(coalesce(cp.city, '')) = '' THEN 'Unknown'
@@ -318,27 +330,28 @@ export async function getIndexedStateCitiesMap(): Promise<Record<string, string[
        AND trim(coalesce(cp.state, '')) <> ''
      GROUP BY 1, 2
      ORDER BY 1, 2`
-  );
+    );
 
-  const map: Record<string, string[]> = {};
-  for (const row of rows) {
-    const stateSlug = canonicalStateSlug(row.state);
-    if (!stateSlug || !allowedStates.has(stateSlug)) continue;
+    const map: Record<string, string[]> = {};
+    for (const row of rows) {
+      const stateSlug = canonicalStateSlug(row.state);
+      if (!stateSlug || !allowedStates.has(stateSlug)) continue;
 
-    const city = normalizeCityForUi(row.city);
-    if (city === 'Unknown') continue;
+      const city = normalizeCityForUi(row.city);
+      if (city === 'Unknown') continue;
 
-    if (!map[stateSlug]) {
-      map[stateSlug] = [];
+      if (!map[stateSlug]) {
+        map[stateSlug] = [];
+      }
+      if (!map[stateSlug].includes(city)) {
+        map[stateSlug].push(city);
+      }
     }
-    if (!map[stateSlug].includes(city)) {
-      map[stateSlug].push(city);
+
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) => a.localeCompare(b));
     }
-  }
 
-  for (const key of Object.keys(map)) {
-    map[key].sort((a, b) => a.localeCompare(b));
-  }
-
-  return map;
+    return map;
+  });
 }

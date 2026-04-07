@@ -1,9 +1,11 @@
 import { pool } from '../db';
+import { queryWithSnapshot } from '../snapshotQuery';
 import type { OshaRow } from './types';
 
 export async function getOshaByCompany(companyName: string, state: string, limit = 100): Promise<OshaRow[]> {
-  const { rows } = await pool.query<OshaRow>(
-    `WITH cleaned AS (
+  return queryWithSnapshot('query_getOshaByCompany', { companyName, state, limit }, async () => {
+    const { rows } = await pool.query<OshaRow>(
+      `WITH cleaned AS (
        SELECT
          inspection_date::text,
          inspection_type,
@@ -57,7 +59,8 @@ export async function getOshaByCompany(companyName: string, state: string, limit
      FROM dedup
      ORDER BY inspection_date DESC NULLS LAST, created_at DESC
      LIMIT $3`,
-    [companyName, state, limit]
-  );
-  return rows;
+      [companyName, state, limit]
+    );
+    return rows;
+  });
 }

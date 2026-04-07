@@ -1,4 +1,5 @@
 import { pool } from '../db';
+import { queryWithSnapshot } from '../snapshotQuery';
 import type { CompanyPageRow, CompanyTimelineRow, RecentCompanyRow, SearchCompanyRow, SearchOptions } from './types';
 
 const STATE_NAME_TO_CODE: Record<string, string> = {
@@ -44,8 +45,9 @@ function sanitizeCity(value: string | null): string | null {
 }
 
 export async function getRecentCompanyPages(limit = 30): Promise<RecentCompanyRow[]> {
-  const { rows } = await pool.query<RecentCompanyRow>(
-    `SELECT
+  return queryWithSnapshot('query_getRecentCompanyPages', { limit }, async () => {
+    const { rows } = await pool.query<RecentCompanyRow>(
+      `SELECT
         cp.slug,
         cp.company_name,
         cp.state,
@@ -74,66 +76,70 @@ export async function getRecentCompanyPages(limit = 30): Promise<RecentCompanyRo
        AND lower(trim(cp.company_name)) <> '- select -'
      ORDER BY cp.id DESC
      LIMIT $1`,
-    [limit]
-  );
-  return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
+      [limit]
+    );
+    return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
+  });
 }
 
 export async function getCompanyBySlug(slug: string): Promise<CompanyPageRow | null> {
-  const { rows } = await pool.query<CompanyPageRow>(
-    `SELECT slug, company_name, state, city, updated_at::text
+  return queryWithSnapshot('query_getCompanyBySlug', { slug }, async () => {
+    const { rows } = await pool.query<CompanyPageRow>(
+      `SELECT slug, company_name, state, city, updated_at::text
      FROM company_pages
      WHERE slug = $1
        AND company_name ~* '[A-Za-z]'
        AND lower(trim(company_name)) <> '- select -'
      LIMIT 1`,
-    [slug]
-  );
-  const row = rows[0] ?? null;
-  return row ? { ...row, city: sanitizeCity(row.city) } : null;
+      [slug]
+    );
+    const row = rows[0] ?? null;
+    return row ? { ...row, city: sanitizeCity(row.city) } : null;
+  });
 }
 
 export async function searchCompanies(options: SearchOptions): Promise<SearchCompanyRow[]> {
   const { query, state, city, hasOsha = false, sort = 'name' } = options;
 
-  const where: string[] = ['cp.company_name ILIKE $1'];
-  const params: Array<string | number> = [`%${query}%`];
+  return queryWithSnapshot('query_searchCompanies', { query, state, city, hasOsha, sort }, async () => {
+    const where: string[] = ['cp.company_name ILIKE $1'];
+    const params: Array<string | number> = [`%${query}%`];
 
-  if (state) {
-    const normalized = normalizeStateInput(state);
-    params.push(normalized.slug, normalized.name, normalized.code);
-    const slugIndex = params.length - 2;
-    const nameIndex = params.length - 1;
-    const codeIndex = params.length;
-    where.push(`(
+    if (state) {
+      const normalized = normalizeStateInput(state);
+      params.push(normalized.slug, normalized.name, normalized.code);
+      const slugIndex = params.length - 2;
+      const nameIndex = params.length - 1;
+      const codeIndex = params.length;
+      where.push(`(
       lower(regexp_replace(cp.state, '\\s+', '-', 'g')) = lower($${slugIndex})
       OR lower(cp.state) = lower($${nameIndex})
       OR lower(cp.state) = lower($${codeIndex})
     )`);
-  }
+    }
 
-  if (city) {
-    params.push(city);
-    where.push(`lower(coalesce(cp.city, '')) = lower($${params.length})`);
-  }
+    if (city) {
+      params.push(city);
+      where.push(`lower(coalesce(cp.city, '')) = lower($${params.length})`);
+    }
 
-  if (hasOsha) {
-    where.push(`EXISTS (
+    if (hasOsha) {
+      where.push(`EXISTS (
       SELECT 1 FROM osha_inspections oi
       WHERE oi.normalized_name = normalize_company_name(cp.company_name)
         AND lower(oi.state) = lower(cp.state)
     )`);
-  }
+    }
 
-  const orderBy =
-    sort === 'updated'
-      ? 'cp.updated_at DESC NULLS LAST, cp.company_name ASC'
-      : sort === 'osha'
-        ? 'osha_count DESC, cp.company_name ASC'
-        : 'cp.company_name ASC';
+    const orderBy =
+      sort === 'updated'
+        ? 'cp.updated_at DESC NULLS LAST, cp.company_name ASC'
+        : sort === 'osha'
+          ? 'osha_count DESC, cp.company_name ASC'
+          : 'cp.company_name ASC';
 
-  const { rows } = await pool.query<SearchCompanyRow>(
-    `SELECT
+    const { rows } = await pool.query<SearchCompanyRow>(
+      `SELECT
         cp.slug,
         cp.company_name,
         cp.state,
@@ -167,15 +173,17 @@ export async function searchCompanies(options: SearchOptions): Promise<SearchCom
        AND ${where.join(' AND ')}
      ORDER BY ${orderBy}
      LIMIT 100`,
-    params
-  );
+      params
+    );
 
-  return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
+    return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
+  });
 }
 
 export async function getCompanyTimeline(companyName: string, state: string, limit = 30): Promise<CompanyTimelineRow[]> {
-  const { rows } = await pool.query<CompanyTimelineRow>(
-    `SELECT event_date, event_type, detail FROM (
+  return queryWithSnapshot('query_getCompanyTimeline', { companyName, state, limit }, async () => {
+    const { rows } = await pool.query<CompanyTimelineRow>(
+      `SELECT event_date, event_type, detail FROM (
        SELECT
          event_date,
          event_type,
@@ -222,15 +230,17 @@ export async function getCompanyTimeline(companyName: string, state: string, lim
      ) timeline
      ORDER BY event_date DESC NULLS LAST, event_type, detail
      LIMIT $3`,
-    [companyName, state, limit]
-  );
+      [companyName, state, limit]
+    );
 
-  return rows;
+    return rows;
+  });
 }
 
 export async function getRelatedCompanies(companyName: string, state: string, city?: string | null, limit = 6, currentSlug?: string): Promise<CompanyPageRow[]> {
-  const { rows } = await pool.query<CompanyPageRow>(
-    `SELECT slug, company_name, state, city, updated_at::text
+  return queryWithSnapshot('query_getRelatedCompanies', { companyName, state, city: city ?? null, limit, currentSlug: currentSlug ?? null }, async () => {
+    const { rows } = await pool.query<CompanyPageRow>(
+      `SELECT slug, company_name, state, city, updated_at::text
      FROM company_pages
      WHERE lower(state) = lower($1)
        AND company_name ~* '[A-Za-z]'
@@ -243,15 +253,17 @@ export async function getRelatedCompanies(companyName: string, state: string, ci
        )
      ORDER BY updated_at DESC NULLS LAST, company_name ASC
      LIMIT $4`,
-    [state, companyName, city ?? null, limit, currentSlug ?? null]
-  );
+      [state, companyName, city ?? null, limit, currentSlug ?? null]
+    );
 
-  return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
+    return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
+  });
 }
 
 export async function getCompanyDetailedLocation(companyName: string, state: string): Promise<string | null> {
-  const { rows } = await pool.query<{ detailed_location: string | null }>(
-    `SELECT trim(oi.city) AS detailed_location
+  return queryWithSnapshot('query_getCompanyDetailedLocation', { companyName, state }, async () => {
+    const { rows } = await pool.query<{ detailed_location: string | null }>(
+      `SELECT trim(oi.city) AS detailed_location
      FROM osha_inspections oi
      WHERE oi.normalized_name = normalize_company_name($1)
        AND lower(oi.state) = lower($2)
@@ -263,10 +275,11 @@ export async function getCompanyDetailedLocation(companyName: string, state: str
        )
      ORDER BY oi.inspection_date DESC NULLS LAST
      LIMIT 1`,
-    [companyName, state]
-  );
+      [companyName, state]
+    );
 
-  return rows[0]?.detailed_location?.trim() || null;
+    return rows[0]?.detailed_location?.trim() || null;
+  });
 }
 
 export async function getCityComplianceBenchmark(
@@ -275,12 +288,13 @@ export async function getCityComplianceBenchmark(
 ): Promise<{ avgOshaRecords: number; activeLicensePct: number; cityCompanyCount: number } | null> {
   if (!city) return null;
 
-  const { rows } = await pool.query<{
+  return queryWithSnapshot('query_getCityComplianceBenchmark', { state, city }, async () => {
+    const { rows } = await pool.query<{
     avg_osha_records: string;
     active_license_pct: string;
     city_company_count: string;
   }>(
-    `WITH city_companies AS (
+      `WITH city_companies AS (
        SELECT normalize_company_name(cp.company_name) AS normalized_name
        FROM company_pages cp
        WHERE lower(cp.state) = lower($1)
@@ -310,14 +324,15 @@ export async function getCityComplianceBenchmark(
      FROM city_companies cc
      LEFT JOIN osha_counts oc ON oc.normalized_name = cc.normalized_name
      LEFT JOIN latest_license ll ON ll.normalized_name = cc.normalized_name`,
-    [state, city]
-  );
+      [state, city]
+    );
 
-  if (!rows[0]) return null;
+    if (!rows[0]) return null;
 
-  return {
-    avgOshaRecords: Number(rows[0].avg_osha_records || 0),
-    activeLicensePct: Number(rows[0].active_license_pct || 0),
-    cityCompanyCount: Number(rows[0].city_company_count || 0),
-  };
+    return {
+      avgOshaRecords: Number(rows[0].avg_osha_records || 0),
+      activeLicensePct: Number(rows[0].active_license_pct || 0),
+      cityCompanyCount: Number(rows[0].city_company_count || 0),
+    };
+  });
 }
