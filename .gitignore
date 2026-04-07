@@ -15,3 +15,7 @@ backups/*.dump
 backups/*.list
 backups/sync_public_*.sql
 backups/local_public_*.sql
+tmp_*.sql
+dev*.log
+scripts/prod_server*.log
+public/page_snapshots/capture.log
