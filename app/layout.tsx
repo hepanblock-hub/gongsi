@@ -4,8 +4,6 @@ import JsonLd from '../components/seo/JsonLd';
 import { SITE_URL } from '../lib/site';
 import './globals.css';
 
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
   title: {
     default: 'Compliance Lookup – Public Company Records',
