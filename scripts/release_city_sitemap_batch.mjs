@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
@@ -6,7 +5,6 @@ import pg from 'pg';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
-const SITEMAP_JSON = path.join(ROOT, 'data', 'released-city-sitemap.json');
 
 function parseArg(name, fallback) {
   const prefix = `--${name}=`;
@@ -61,6 +59,16 @@ async function main() {
   const client = new pg.Client(dbConfig);
   await client.connect();
 
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS city_release_control (
+      state_slug text NOT NULL,
+      city_slug text NOT NULL,
+      city_name text NOT NULL,
+      released_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (state_slug, city_slug)
+    )
+  `);
+
   const stateCode = state === 'california' ? 'CA' : state.toUpperCase();
   const stateName = state === 'california' ? 'California' : state;
 
@@ -79,8 +87,6 @@ async function main() {
     [stateCode, stateName]
   );
 
-  await client.end();
-
   const cityCounts = new Map();
   for (const row of result.rows) {
     const cleaned = cleanCity(row.city);
@@ -92,18 +98,31 @@ async function main() {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([name]) => ({ name, slug: toCitySlug(name) }));
 
-  const existing = fs.existsSync(SITEMAP_JSON)
-    ? JSON.parse(fs.readFileSync(SITEMAP_JSON, 'utf8'))
-    : {};
-
-  const current = Array.isArray(existing[state]) ? existing[state] : [];
-  const currentSet = new Set(current.map((item) => item.slug));
+  const released = await client.query(
+    `SELECT city_slug
+     FROM city_release_control
+     WHERE state_slug = $1`,
+    [state]
+  );
+  const currentSet = new Set(released.rows.map((item) => item.city_slug));
 
   const toAdd = ranked.filter((item) => !currentSet.has(item.slug)).slice(0, batch);
-  const merged = [...current, ...toAdd];
 
-  existing[state] = merged;
-  fs.writeFileSync(SITEMAP_JSON, `${JSON.stringify(existing, null, 2)}\n`, 'utf8');
+  if (toAdd.length > 0) {
+    const valuesSql = toAdd
+      .map((_, idx) => `($1, $${idx * 2 + 2}, $${idx * 2 + 3})`)
+      .join(', ');
+    const params = [state, ...toAdd.flatMap((item) => [item.slug, item.name])];
+
+    await client.query(
+      `INSERT INTO city_release_control (state_slug, city_slug, city_name)
+       VALUES ${valuesSql}
+       ON CONFLICT (state_slug, city_slug) DO NOTHING`,
+      params
+    );
+  }
+
+  await client.end();
 
   if (toAdd.length === 0) {
     console.log(`[done] no unreleased city pages left for ${state}`);
@@ -114,7 +133,7 @@ async function main() {
   for (const item of toAdd) {
     console.log(` - ${item.name}: /state/${state}/city/${item.slug}`);
   }
-  console.log(`\nThis release file now controls:`);
+  console.log(`\nRelease database now controls:`);
   console.log(` - city pages`);
   console.log(` - company pages under those cities`);
   console.log(` - city/company sitemap URLs`);

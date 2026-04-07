@@ -1,5 +1,11 @@
 import { pool } from '../db';
-import { getReleaseVisibilityVersion, hasReleasedCityControl, isReleasedCityName, toReleasedCitySlug } from '../release';
+import {
+  getReleaseVisibilityVersion,
+  hasReleasedCityControl,
+  isReleasedCityBySet,
+  releasedCitySlugSet,
+  toReleasedCitySlug,
+} from '../release';
 import { queryWithSnapshot } from '../snapshotQuery';
 import { normalizeStateSlug, stateSlugToName } from '../site';
 import type { CompanyPageRow } from './types';
@@ -83,7 +89,7 @@ function normalizeCityForUi(rawCity: string): string {
 export async function getStateCompanyPages(stateSlug: string, limit = 200): Promise<CompanyPageRow[]> {
   const stateName = stateSlugToName(stateSlug);
   const stateCode = STATE_NAME_TO_CODE[stateName.toLowerCase()] ?? '';
-  const releaseVersion = getReleaseVisibilityVersion();
+  const releaseVersion = await getReleaseVisibilityVersion();
   return queryWithSnapshot('query_getStateCompanyPages', { stateSlug, limit, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const { rows } = await pool.query<CompanyPageRow>(
       `SELECT slug, company_name, state, city, updated_at::text
@@ -99,14 +105,16 @@ export async function getStateCompanyPages(stateSlug: string, limit = 200): Prom
      LIMIT $4`,
       [normalizeStateSlug(stateSlug), stateName, stateCode, limit]
     );
-    return rows.filter((row) => isReleasedCityName(stateSlug, row.city));
+    const citySet = await releasedCitySlugSet(stateSlug);
+    const hasControl = citySet.size > 0;
+    return rows.filter((row) => isReleasedCityBySet(citySet, hasControl, toReleasedCitySlug(row.city)));
   });
 }
 
 export async function getStateCompanyPagesWithCategory(stateSlug: string, limit = 5000): Promise<StateCompanyCategoryRow[]> {
   const stateName = stateSlugToName(stateSlug);
   const stateCode = STATE_NAME_TO_CODE[stateName.toLowerCase()] ?? '';
-  const releaseVersion = getReleaseVisibilityVersion();
+  const releaseVersion = await getReleaseVisibilityVersion();
   return queryWithSnapshot('query_getStateCompanyPagesWithCategory', { stateSlug, limit, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const { rows } = await pool.query<StateCompanyCategoryRow>(
       `SELECT
@@ -175,7 +183,9 @@ export async function getStateCompanyPagesWithCategory(stateSlug: string, limit 
       [normalizeStateSlug(stateSlug), stateName, stateCode, limit]
     );
 
-    return rows.filter((row) => isReleasedCityName(stateSlug, row.city));
+    const citySet = await releasedCitySlugSet(stateSlug);
+    const hasControl = citySet.size > 0;
+    return rows.filter((row) => isReleasedCityBySet(citySet, hasControl, toReleasedCitySlug(row.city)));
   });
 }
 
@@ -250,7 +260,7 @@ export async function getStateCityCounts(stateSlug: string, limit?: number): Pro
     ? [normalizeStateSlug(stateSlug), stateName, stateCode, limit]
     : [normalizeStateSlug(stateSlug), stateName, stateCode];
 
-  const releaseVersion = getReleaseVisibilityVersion();
+  const releaseVersion = await getReleaseVisibilityVersion();
   return queryWithSnapshot('query_getStateCityCounts', { stateSlug, limit: limit ?? null, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const { rows } = await pool.query<{ city: string; company_count: string }>(
       `SELECT
@@ -280,9 +290,12 @@ export async function getStateCityCounts(stateSlug: string, limit?: number): Pro
       counts.set(city, (counts.get(city) ?? 0) + Number(row.company_count));
     }
 
+    const citySet = await releasedCitySlugSet(stateSlug);
+    const hasControl = citySet.size > 0;
+
     return Array.from(counts.entries())
       .map(([city, company_count]) => ({ city, company_count }))
-      .filter((row) => isReleasedCityName(stateSlug, row.city))
+      .filter((row) => isReleasedCityBySet(citySet, hasControl, toReleasedCitySlug(row.city)))
       .sort((a, b) => b.company_count - a.company_count || a.city.localeCompare(b.city))
       .slice(0, typeof limit === 'number' && limit > 0 ? limit : Number.MAX_SAFE_INTEGER);
   });
@@ -320,7 +333,7 @@ export async function getIndexedStates(): Promise<Array<{ slug: string; name: st
 }
 
 export async function getIndexedStateCitiesMap(): Promise<Record<string, string[]>> {
-  const releaseVersion = getReleaseVisibilityVersion();
+  const releaseVersion = await getReleaseVisibilityVersion();
   return queryWithSnapshot('query_getIndexedStateCitiesMap', { releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const allowedStates = new Set(await getIndexedStateSlugs());
 
@@ -340,6 +353,7 @@ export async function getIndexedStateCitiesMap(): Promise<Record<string, string[
     );
 
     const map: Record<string, string[]> = {};
+    const releasedSetCache = new Map<string, { hasControl: boolean; citySet: Set<string> }>();
     for (const row of rows) {
       const stateSlug = canonicalStateSlug(row.state);
       if (!stateSlug || !allowedStates.has(stateSlug)) continue;
@@ -347,9 +361,14 @@ export async function getIndexedStateCitiesMap(): Promise<Record<string, string[
       const city = normalizeCityForUi(row.city);
       if (city === 'Unknown') continue;
 
-      if (hasReleasedCityControl(stateSlug) && !isReleasedCityName(stateSlug, city)) {
-        continue;
+      let cache = releasedSetCache.get(stateSlug);
+      if (!cache) {
+        const citySet = await releasedCitySlugSet(stateSlug);
+        cache = { hasControl: citySet.size > 0, citySet };
+        releasedSetCache.set(stateSlug, cache);
       }
+
+      if (!isReleasedCityBySet(cache.citySet, cache.hasControl, toReleasedCitySlug(city))) continue;
 
       const citySlug = toReleasedCitySlug(city);
       if (!citySlug) continue;

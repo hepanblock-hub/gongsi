@@ -1,5 +1,4 @@
-import fs from 'node:fs';
-import path from 'node:path';
+import { pool } from './db';
 import { normalizeStateSlug } from './site';
 
 type ReleasedCityEntry = {
@@ -8,38 +7,82 @@ type ReleasedCityEntry = {
 };
 
 type ReleasedCityMap = Record<string, ReleasedCityEntry[]>;
+type ReleasedCityRow = {
+  state_slug: string;
+  city_slug: string;
+  city_name: string;
+};
 
 const STATE_CODE_TO_SLUG: Record<string, string> = {
   CA: 'california',
 };
 
-const RELEASE_FILE = path.join(process.cwd(), 'data', 'released-city-sitemap.json');
+const RELEASE_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS city_release_control (
+  state_slug text NOT NULL,
+  city_slug text NOT NULL,
+  city_name text NOT NULL,
+  released_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (state_slug, city_slug)
+);
+`;
 
-function loadReleasedCityMap(): ReleasedCityMap {
+let ensured = false;
+let ensurePromise: Promise<void> | null = null;
+
+async function ensureReleaseTable(): Promise<void> {
+  if (ensured) return;
+  if (!ensurePromise) {
+    ensurePromise = (async () => {
+      try {
+        await pool.query(RELEASE_TABLE_SQL);
+      } finally {
+        ensured = true;
+      }
+    })();
+  }
+  await ensurePromise;
+}
+
+async function loadReleasedCityMap(): Promise<ReleasedCityMap> {
+  await ensureReleaseTable();
   try {
-    const raw = fs.readFileSync(RELEASE_FILE, 'utf8');
-    const parsed = JSON.parse(raw) as ReleasedCityMap;
-    return parsed ?? {};
+    const { rows } = await pool.query<ReleasedCityRow>(
+      `SELECT state_slug, city_slug, city_name
+       FROM city_release_control
+       ORDER BY state_slug ASC, released_at ASC, city_name ASC`
+    );
+
+    const map: ReleasedCityMap = {};
+    for (const row of rows) {
+      const stateSlug = normalizeStateSlug(row.state_slug);
+      if (!map[stateSlug]) {
+        map[stateSlug] = [];
+      }
+      map[stateSlug].push({ slug: row.city_slug, name: row.city_name });
+    }
+
+    return map;
   } catch {
     return {};
   }
 }
 
-export function getReleaseVisibilityVersion(): string {
-  return JSON.stringify(loadReleasedCityMap());
+export async function getReleaseVisibilityVersion(): Promise<string> {
+  return JSON.stringify(await loadReleasedCityMap());
 }
 
-export function getReleasedCityEntries(stateSlug: string): ReleasedCityEntry[] {
-  const map = loadReleasedCityMap();
+export async function getReleasedCityEntries(stateSlug: string): Promise<ReleasedCityEntry[]> {
+  const map = await loadReleasedCityMap();
   return map[normalizeStateSlug(stateSlug)] ?? [];
 }
 
-export function hasReleasedCityControl(stateSlug: string): boolean {
-  return getReleasedCityEntries(stateSlug).length > 0;
+export async function hasReleasedCityControl(stateSlug: string): Promise<boolean> {
+  return (await getReleasedCityEntries(stateSlug)).length > 0;
 }
 
-export function releasedCitySlugSet(stateSlug: string): Set<string> {
-  return new Set(getReleasedCityEntries(stateSlug).map((entry) => entry.slug));
+export async function releasedCitySlugSet(stateSlug: string): Promise<Set<string>> {
+  return new Set((await getReleasedCityEntries(stateSlug)).map((entry) => entry.slug));
 }
 
 export function toReleasedCitySlug(value: string | null): string | null {
@@ -74,19 +117,29 @@ export function normalizeReleaseStateSlug(rawState: string): string {
   return normalizeStateSlug(trimmed);
 }
 
-export function isReleasedCity(stateSlug: string, citySlug: string): boolean {
-  if (!hasReleasedCityControl(stateSlug)) return true;
-  return releasedCitySlugSet(stateSlug).has(citySlug);
+export async function isReleasedCity(stateSlug: string, citySlug: string): Promise<boolean> {
+  if (!(await hasReleasedCityControl(stateSlug))) return true;
+  return (await releasedCitySlugSet(stateSlug)).has(citySlug);
 }
 
-export function isReleasedCityName(stateSlug: string, city: string | null): boolean {
-  if (!hasReleasedCityControl(stateSlug)) return true;
+export async function isReleasedCityName(stateSlug: string, city: string | null): Promise<boolean> {
+  if (!(await hasReleasedCityControl(stateSlug))) return true;
   const slug = toReleasedCitySlug(city);
   if (!slug) return false;
-  return releasedCitySlugSet(stateSlug).has(slug);
+  return (await releasedCitySlugSet(stateSlug)).has(slug);
 }
 
-export function isReleasedCompanyLocation(state: string, city: string | null): boolean {
+export async function isReleasedCompanyLocation(state: string, city: string | null): Promise<boolean> {
   const stateSlug = normalizeReleaseStateSlug(state);
   return isReleasedCityName(stateSlug, city);
+}
+
+export function isReleasedCityBySet(
+  citySet: Set<string>,
+  hasControl: boolean,
+  citySlug: string | null
+): boolean {
+  if (!hasControl) return true;
+  if (!citySlug) return false;
+  return citySet.has(citySlug);
 }

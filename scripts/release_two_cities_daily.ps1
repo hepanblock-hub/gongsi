@@ -3,6 +3,34 @@ $ErrorActionPreference = 'Stop'
 $root = 'D:\gongsihegui'
 Set-Location $root
 
+function Get-EnvValueFromFile {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$FilePath,
+    [Parameter(Mandatory = $true)]
+    [string]$Key
+  )
+
+  if (-not (Test-Path $FilePath)) {
+    return $null
+  }
+
+  $pattern = "^\s*" + [regex]::Escape($Key) + "\s*=\s*(.+?)\s*$"
+  foreach ($line in Get-Content -Path $FilePath -Encoding UTF8) {
+    if ($line.Trim().StartsWith('#')) { continue }
+    $m = [regex]::Match($line, $pattern)
+    if ($m.Success) {
+      $value = $m.Groups[1].Value.Trim()
+      if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+        $value = $value.Substring(1, $value.Length - 2)
+      }
+      return $value
+    }
+  }
+
+  return $null
+}
+
 function Invoke-StrictCommand {
   param(
     [Parameter(Mandatory = $true)]
@@ -17,34 +45,19 @@ function Invoke-StrictCommand {
   }
 }
 
+$prodEnvPath = Join-Path $root '.env.production'
+$prodDatabaseUrl = Get-EnvValueFromFile -FilePath $prodEnvPath -Key 'DATABASE_URL'
+
+if ([string]::IsNullOrWhiteSpace($prodDatabaseUrl)) {
+  throw "DATABASE_URL not found in $prodEnvPath."
+}
+
+if ($prodDatabaseUrl -match 'localhost|127\.0\.0\.1') {
+  throw 'Refusing to run: .env.production DATABASE_URL points to local database.'
+}
+
+$env:DATABASE_URL = $prodDatabaseUrl
+Write-Host 'Target database: production (from .env.production)'
+
 Invoke-StrictCommand -Command { node .\scripts\release_city_sitemap_batch.mjs --state=california --batch=2 } -ErrorMessage 'City release script failed.'
-
-& git diff --quiet -- data/released-city-sitemap.json
-if ($LASTEXITCODE -eq 0) {
-  Write-Host 'No unreleased California cities left. Nothing to push.'
-  exit 0
-}
-
-$stamp = Get-Date -Format 'yyyy-MM-dd'
-Invoke-StrictCommand -Command { git add data/released-city-sitemap.json } -ErrorMessage 'git add failed.'
-Invoke-StrictCommand -Command { git commit -m "chore: release next 2 california cities ($stamp)" } -ErrorMessage 'git commit failed.'
-
-$pushed = $false
-for ($attempt = 1; $attempt -le 3; $attempt++) {
-  & git push origin main
-  if ($LASTEXITCODE -eq 0) {
-    $pushed = $true
-    break
-  }
-
-  if ($attempt -lt 3) {
-    Write-Warning "git push failed (attempt $attempt/3). Retrying in 3 seconds..."
-    Start-Sleep -Seconds 3
-  }
-}
-
-if (-not $pushed) {
-  throw 'git push failed after 3 attempts.'
-}
-
-Write-Host 'Done. Released 2 more California cities and pushed source.'
+Write-Host 'Done. Released 2 more California cities with pure database operation.'

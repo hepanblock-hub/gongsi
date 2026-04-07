@@ -35,6 +35,7 @@ export default async function StateCitiesPage({
 }) {
   const { stateSlug } = await params;
   const stateName = stateSlugToName(stateSlug);
+  const releasedOnly = await hasReleasedCityControl(stateSlug);
 
   const allCities = await getStateCityCounts(stateSlug);
 
@@ -50,12 +51,12 @@ export default async function StateCitiesPage({
 
       <PageTitle
         title={`${stateName} cities with company compliance data`}
-        description={hasReleasedCityControl(stateSlug)
+        description={releasedOnly
           ? 'Released city pages only. New cities are added in controlled batches.'
           : 'All cities with indexed company records for OSHA, contractor licenses, and business registrations.'}
       />
 
-      <SectionCard title={hasReleasedCityControl(stateSlug) ? 'Released cities' : 'All cities'}>
+      <SectionCard title={releasedOnly ? 'Released cities' : 'All cities'}>
         <table>
           <thead>
             <tr>

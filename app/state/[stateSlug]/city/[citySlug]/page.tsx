@@ -10,7 +10,8 @@ import { stateSlugToName } from '../../../../../lib/site';
 export const revalidate = 86400;
 
 export async function generateStaticParams() {
-  return getReleasedCityEntries('california').map((city) => ({ stateSlug: 'california', citySlug: city.slug }));
+  const cities = await getReleasedCityEntries('california');
+  return cities.map((city) => ({ stateSlug: 'california', citySlug: city.slug }));
 }
 
 function normalizeCityName(value: string | null): string {
@@ -98,7 +99,7 @@ function inferIndustryTag(companyName: string): string {
 
 export async function generateMetadata({ params }: { params: Promise<{ stateSlug: string; citySlug: string }> }): Promise<Metadata> {
   const { stateSlug, citySlug } = await params;
-  if (!isReleasedCity(stateSlug, citySlug)) {
+  if (!(await isReleasedCity(stateSlug, citySlug))) {
     return {
       title: { absolute: 'City records | Compliance Lookup' },
       robots: { index: false, follow: false },
@@ -119,7 +120,7 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
 
 export default async function StateCityPage({ params }: { params: Promise<{ stateSlug: string; citySlug: string }> }) {
   const { stateSlug, citySlug: targetCitySlug } = await params;
-  if (!isReleasedCity(stateSlug, targetCitySlug)) redirect(`/state/${stateSlug}/cities`);
+  if (!(await isReleasedCity(stateSlug, targetCitySlug))) redirect(`/state/${stateSlug}/cities`);
   const stateName = stateSlugToName(stateSlug);
   const allCompanies = await getStateCompanyPagesWithCategory(stateSlug, 5000);
   const companies = allCompanies

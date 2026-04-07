@@ -5,7 +5,6 @@ import PageTitle from '../../../components/common/PageTitle';
 import SectionCard from '../../../components/common/SectionCard';
 import BreadcrumbJsonLd from '../../../components/seo/BreadcrumbJsonLd';
 import { canonicalCityPath, canonicalFilterPath } from '../../../lib/indexing';
-import { isReleasedCityName } from '../../../lib/release';
 import { getStateCityCounts, getStateCompanyPagesWithCategory, getStateSummary, type StateCompanyCategoryRow } from '../../../lib/queries';
 import { SITE_URL, stateSlugToName } from '../../../lib/site';
 
@@ -106,7 +105,7 @@ export default async function StatePage({
   const allCompanies = await getStateCompanyPagesWithCategory(stateSlug, 5000);
   const cityCounts = await getStateCityCounts(stateSlug);
 
-  const companiesBySearch = allCompanies.filter((company) => isReleasedCityName(stateSlug, company.city));
+  const companiesBySearch = allCompanies;
   const companies = companiesBySearch;
 
   const cityMap = new Map<string, StateCompanyCategoryRow[]>();
