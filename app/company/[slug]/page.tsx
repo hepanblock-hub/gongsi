@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import Breadcrumbs from '../../../components/common/Breadcrumbs';
 import DecisionSupportLayers, { buildBottomLineAssessment } from '../../../components/company/DecisionSupportLayers';
 import PageTitle from '../../../components/common/PageTitle';
@@ -7,10 +7,12 @@ import SectionCard from '../../../components/common/SectionCard';
 import StatusBadge from '../../../components/common/StatusBadge';
 import BreadcrumbJsonLd from '../../../components/seo/BreadcrumbJsonLd';
 import { canonicalFilterPath } from '../../../lib/indexing';
+import { isReleasedCompanyLocation } from '../../../lib/release';
 import {
   getCityComplianceBenchmark,
   getCompanyDetailedLocation,
   getCompanyBySlug,
+  getCompanyBySlugForRouting,
   getCompanyTimeline,
   getLicensesByCompany,
   getOshaByCompany,
@@ -218,8 +220,18 @@ function toCitySlug(value: string): string {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const fullSlug = companyPathFromSlug(slug);
-  const page = await getCompanyBySlug(fullSlug);
+  const routePage = await getCompanyBySlugForRouting(fullSlug);
 
+  if (!routePage) return { title: 'Company not found' };
+  if (!isReleasedCompanyLocation(routePage.state, routePage.city)) {
+    return {
+      title: { absolute: 'Company records | Compliance Lookup' },
+      robots: { index: false, follow: false },
+      alternates: { canonical: `/state/${normalizeStateSlug(routePage.state)}` },
+    };
+  }
+
+  const page = await getCompanyBySlug(fullSlug);
   if (!page) return { title: 'Company not found' };
   const entityLooksReal = isLikelyRealCompanyName(page.company_name);
   const stateName = fullStateName(page.state);
@@ -290,6 +302,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function CompanyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const fullSlug = companyPathFromSlug(slug);
+  const routePage = await getCompanyBySlugForRouting(fullSlug);
+
+  if (!routePage) notFound();
+  if (!isReleasedCompanyLocation(routePage.state, routePage.city)) {
+    redirect(`/state/${normalizeStateSlug(routePage.state)}`);
+  }
+
   const page = await getCompanyBySlug(fullSlug);
 
   if (!page) notFound();

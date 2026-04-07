@@ -3,6 +3,7 @@ import Breadcrumbs from '../../../../components/common/Breadcrumbs';
 import PageTitle from '../../../../components/common/PageTitle';
 import SectionCard from '../../../../components/common/SectionCard';
 import { getStateCityCounts } from '../../../../lib/queries';
+import { hasReleasedCityControl } from '../../../../lib/release';
 import { stateSlugToName } from '../../../../lib/site';
 
 export const dynamic = 'force-dynamic';
@@ -49,10 +50,12 @@ export default async function StateCitiesPage({
 
       <PageTitle
         title={`${stateName} cities with company compliance data`}
-        description="All cities with indexed company records for OSHA, contractor licenses, and business registrations."
+        description={hasReleasedCityControl(stateSlug)
+          ? 'Released city pages only. New cities are added in controlled batches.'
+          : 'All cities with indexed company records for OSHA, contractor licenses, and business registrations.'}
       />
 
-      <SectionCard title="All cities">
+      <SectionCard title={hasReleasedCityControl(stateSlug) ? 'Released cities' : 'All cities'}>
         <table>
           <thead>
             <tr>

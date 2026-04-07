@@ -4,3 +4,4 @@ export * from './queries/osha';
 export * from './queries/license';
 export * from './queries/registration';
 export * from './queries/state';
+export * from './release';

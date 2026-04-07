@@ -16,7 +16,7 @@ function parseArg(name, fallback) {
 }
 
 const state = (parseArg('state', 'california') || 'california').toLowerCase();
-const batch = Math.max(1, Number(parseArg('batch', '5')) || 5);
+const batch = Math.max(1, Number(parseArg('batch', '2')) || 2);
 
 const dbConfig = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL, ssl: false }
@@ -114,10 +114,10 @@ async function main() {
   for (const item of toAdd) {
     console.log(` - ${item.name}: /state/${state}/city/${item.slug}`);
   }
-  console.log(`\nNext step:`);
-  console.log(`git add data/released-city-sitemap.json`);
-  console.log(`git commit -m "chore: release ${toAdd.length} more ${state} city sitemap pages"`);
-  console.log(`git push origin main`);
+  console.log(`\nThis release file now controls:`);
+  console.log(` - city pages`);
+  console.log(` - company pages under those cities`);
+  console.log(` - city/company sitemap URLs`);
 }
 
 main().catch((err) => {

@@ -1,5 +1,5 @@
 import { absoluteUrl, chunkArray, PRIMARY_FILTER_SLUGS, xmlEscape } from '../../lib/indexing';
-import { countIndexableCompanies, getIndexedStateCitiesMap, getIndexedStates } from '../../lib/queries';
+import { countIndexableCompanies, getIndexedStateCitiesMap, getIndexedStates, hasReleasedCityControl } from '../../lib/queries';
 
 const CITY_CHUNK_SIZE = 5000;
 const FILTER_CHUNK_SIZE = 5000;

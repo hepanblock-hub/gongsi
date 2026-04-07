@@ -1,18 +1,16 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import Breadcrumbs from '../../../../../components/common/Breadcrumbs';
 import PageTitle from '../../../../../components/common/PageTitle';
 import SectionCard from '../../../../../components/common/SectionCard';
+import { getReleasedCityEntries, isReleasedCity } from '../../../../../lib/release';
 import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
 import { stateSlugToName } from '../../../../../lib/site';
 
 export const revalidate = 86400;
 
 export async function generateStaticParams() {
-  const cities = [
-    'los-angeles', 'san-diego', 'san-jose', 'sacramento', 'san-francisco',
-  ];
-  return cities.map((citySlug) => ({ stateSlug: 'california', citySlug }));
+  return getReleasedCityEntries('california').map((city) => ({ stateSlug: 'california', citySlug: city.slug }));
 }
 
 function normalizeCityName(value: string | null): string {
@@ -100,6 +98,13 @@ function inferIndustryTag(companyName: string): string {
 
 export async function generateMetadata({ params }: { params: Promise<{ stateSlug: string; citySlug: string }> }): Promise<Metadata> {
   const { stateSlug, citySlug } = await params;
+  if (!isReleasedCity(stateSlug, citySlug)) {
+    return {
+      title: { absolute: 'City records | Compliance Lookup' },
+      robots: { index: false, follow: false },
+      alternates: { canonical: `/state/${stateSlug}/cities` },
+    };
+  }
   const stateName = stateSlugToName(stateSlug);
   const cityName = citySlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   return {
@@ -114,6 +119,7 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
 
 export default async function StateCityPage({ params }: { params: Promise<{ stateSlug: string; citySlug: string }> }) {
   const { stateSlug, citySlug: targetCitySlug } = await params;
+  if (!isReleasedCity(stateSlug, targetCitySlug)) redirect(`/state/${stateSlug}/cities`);
   const stateName = stateSlugToName(stateSlug);
   const allCompanies = await getStateCompanyPagesWithCategory(stateSlug, 5000);
   const companies = allCompanies

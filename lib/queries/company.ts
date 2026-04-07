@@ -1,4 +1,5 @@
 import { pool } from '../db';
+import { getReleaseVisibilityVersion, isReleasedCompanyLocation } from '../release';
 import { queryWithSnapshot } from '../snapshotQuery';
 import type { CompanyPageRow, CompanyTimelineRow, RecentCompanyRow, SearchCompanyRow, SearchOptions } from './types';
 
@@ -12,6 +13,8 @@ const STATE_NAME_TO_CODE: Record<string, string> = {
   tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV',
   wisconsin: 'WI', wyoming: 'WY',
 };
+
+const RELEASE_QUERY_VERSION = 'released-city-visibility-v1';
 
 function normalizeStateInput(value: string): { slug: string; name: string; code: string } {
   const trimmed = value.trim();
@@ -45,7 +48,8 @@ function sanitizeCity(value: string | null): string | null {
 }
 
 export async function getRecentCompanyPages(limit = 30): Promise<RecentCompanyRow[]> {
-  return queryWithSnapshot('query_getRecentCompanyPages', { limit }, async () => {
+  const releaseVersion = getReleaseVisibilityVersion();
+  return queryWithSnapshot('query_getRecentCompanyPages', { limit, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const { rows } = await pool.query<RecentCompanyRow>(
       `SELECT
         cp.slug,
@@ -76,44 +80,51 @@ export async function getRecentCompanyPages(limit = 30): Promise<RecentCompanyRo
        AND lower(trim(cp.company_name)) <> '- select -'
      ORDER BY cp.id DESC
      LIMIT $1`,
-      [limit]
+      [Math.max(limit * 10, 100)]
     );
-    return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
+    return rows
+      .map((row) => ({ ...row, city: sanitizeCity(row.city) }))
+      .filter((row) => isReleasedCompanyLocation(row.state, row.city))
+      .slice(0, limit);
   });
 }
 
 export async function countIndexableCompanies(): Promise<number> {
-  return queryWithSnapshot('query_countIndexableCompanies', {}, async () => {
-    const { rows } = await pool.query<{ total: string }>(
-      `SELECT COUNT(*)::text AS total
+  const releaseVersion = getReleaseVisibilityVersion();
+  return queryWithSnapshot('query_countIndexableCompanies', { releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
+    const { rows } = await pool.query<{ slug: string; state: string; city: string | null }>(
+      `SELECT cp.slug, cp.state, cp.city
        FROM company_pages cp
        WHERE cp.company_name ~* '[A-Za-z]'
          AND lower(trim(cp.company_name)) <> '- select -'`
     );
 
-    return Number(rows[0]?.total ?? 0);
+    return rows.filter((row) => isReleasedCompanyLocation(row.state, sanitizeCity(row.city))).length;
   });
 }
 
 export async function getCompanySitemapBatch(offset = 0, limit = 5000): Promise<Array<{ slug: string; updated_at: string | null }>> {
-  return queryWithSnapshot('query_getCompanySitemapBatch', { offset, limit }, async () => {
-    const { rows } = await pool.query<{ slug: string; updated_at: string | null }>(
-      `SELECT cp.slug, cp.updated_at::text
+  const releaseVersion = getReleaseVisibilityVersion();
+  return queryWithSnapshot('query_getCompanySitemapBatch', { offset, limit, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
+    const { rows } = await pool.query<{ slug: string; updated_at: string | null; state: string; city: string | null }>(
+      `SELECT cp.slug, cp.updated_at::text, cp.state, cp.city
        FROM company_pages cp
        WHERE cp.company_name ~* '[A-Za-z]'
          AND lower(trim(cp.company_name)) <> '- select -'
        ORDER BY cp.id ASC
-       OFFSET $1
-       LIMIT $2`,
-      [offset, limit]
+       `
     );
 
-    return rows;
+    return rows
+      .filter((row) => isReleasedCompanyLocation(row.state, sanitizeCity(row.city)))
+      .slice(offset, offset + limit)
+      .map((row) => ({ slug: row.slug, updated_at: row.updated_at }));
   });
 }
 
 export async function getCompanyBySlug(slug: string): Promise<CompanyPageRow | null> {
-  return queryWithSnapshot('query_getCompanyBySlug', { slug }, async () => {
+  const releaseVersion = getReleaseVisibilityVersion();
+  return queryWithSnapshot('query_getCompanyBySlug', { slug, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const { rows } = await pool.query<CompanyPageRow>(
       `SELECT slug, company_name, state, city, updated_at::text
      FROM company_pages
@@ -124,6 +135,25 @@ export async function getCompanyBySlug(slug: string): Promise<CompanyPageRow | n
       [slug]
     );
     const row = rows[0] ?? null;
+    const normalized = row ? { ...row, city: sanitizeCity(row.city) } : null;
+    if (!normalized) return null;
+    return isReleasedCompanyLocation(normalized.state, normalized.city) ? normalized : null;
+  });
+}
+
+export async function getCompanyBySlugForRouting(slug: string): Promise<CompanyPageRow | null> {
+  return queryWithSnapshot('query_getCompanyBySlugForRouting', { slug }, async () => {
+    const { rows } = await pool.query<CompanyPageRow>(
+      `SELECT slug, company_name, state, city, updated_at::text
+     FROM company_pages
+     WHERE slug = $1
+       AND company_name ~* '[A-Za-z]'
+       AND lower(trim(company_name)) <> '- select -'
+     LIMIT 1`,
+      [slug]
+    );
+
+    const row = rows[0] ?? null;
     return row ? { ...row, city: sanitizeCity(row.city) } : null;
   });
 }
@@ -131,7 +161,8 @@ export async function getCompanyBySlug(slug: string): Promise<CompanyPageRow | n
 export async function searchCompanies(options: SearchOptions): Promise<SearchCompanyRow[]> {
   const { query, state, city, hasOsha = false, sort = 'name' } = options;
 
-  return queryWithSnapshot('query_searchCompanies', { query, state, city, hasOsha, sort }, async () => {
+  const releaseVersion = getReleaseVisibilityVersion();
+  return queryWithSnapshot('query_searchCompanies', { query, state, city, hasOsha, sort, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const where: string[] = ['cp.company_name ILIKE $1'];
     const params: Array<string | number> = [`%${query}%`];
 
@@ -206,7 +237,9 @@ export async function searchCompanies(options: SearchOptions): Promise<SearchCom
       params
     );
 
-    return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
+    return rows
+      .map((row) => ({ ...row, city: sanitizeCity(row.city) }))
+      .filter((row) => isReleasedCompanyLocation(row.state, row.city));
   });
 }
 
@@ -268,7 +301,8 @@ export async function getCompanyTimeline(companyName: string, state: string, lim
 }
 
 export async function getRelatedCompanies(companyName: string, state: string, city?: string | null, limit = 6, currentSlug?: string): Promise<CompanyPageRow[]> {
-  return queryWithSnapshot('query_getRelatedCompanies', { companyName, state, city: city ?? null, limit, currentSlug: currentSlug ?? null }, async () => {
+  const releaseVersion = getReleaseVisibilityVersion();
+  return queryWithSnapshot('query_getRelatedCompanies', { companyName, state, city: city ?? null, limit, currentSlug: currentSlug ?? null, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const { rows } = await pool.query<CompanyPageRow>(
       `SELECT slug, company_name, state, city, updated_at::text
      FROM company_pages
@@ -282,11 +316,14 @@ export async function getRelatedCompanies(companyName: string, state: string, ci
          OR company_name ILIKE split_part($2, ' ', 1) || '%'
        )
      ORDER BY updated_at DESC NULLS LAST, company_name ASC
-     LIMIT $4`,
-      [state, companyName, city ?? null, limit, currentSlug ?? null]
+       LIMIT $4`,
+      [state, companyName, city ?? null, Math.max(limit * 5, 24), currentSlug ?? null]
     );
 
-    return rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
+    return rows
+      .map((row) => ({ ...row, city: sanitizeCity(row.city) }))
+      .filter((row) => isReleasedCompanyLocation(row.state, row.city))
+      .slice(0, limit);
   });
 }
 

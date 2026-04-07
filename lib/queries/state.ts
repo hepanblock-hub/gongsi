@@ -1,4 +1,5 @@
 import { pool } from '../db';
+import { getReleaseVisibilityVersion, hasReleasedCityControl, isReleasedCityName, toReleasedCitySlug } from '../release';
 import { queryWithSnapshot } from '../snapshotQuery';
 import { normalizeStateSlug, stateSlugToName } from '../site';
 import type { CompanyPageRow } from './types';
@@ -34,6 +35,7 @@ export type StateCityCountRow = {
 };
 
 const MIN_INDEXED_STATE_COMPANY_COUNT = Number(process.env.MIN_INDEXED_STATE_COMPANY_COUNT ?? 50);
+const RELEASE_QUERY_VERSION = 'released-city-visibility-v1';
 
 function canonicalStateSlug(rawState: string): string | null {
   const raw = rawState.trim();
@@ -81,7 +83,8 @@ function normalizeCityForUi(rawCity: string): string {
 export async function getStateCompanyPages(stateSlug: string, limit = 200): Promise<CompanyPageRow[]> {
   const stateName = stateSlugToName(stateSlug);
   const stateCode = STATE_NAME_TO_CODE[stateName.toLowerCase()] ?? '';
-  return queryWithSnapshot('query_getStateCompanyPages', { stateSlug, limit }, async () => {
+  const releaseVersion = getReleaseVisibilityVersion();
+  return queryWithSnapshot('query_getStateCompanyPages', { stateSlug, limit, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const { rows } = await pool.query<CompanyPageRow>(
       `SELECT slug, company_name, state, city, updated_at::text
      FROM company_pages
@@ -96,14 +99,15 @@ export async function getStateCompanyPages(stateSlug: string, limit = 200): Prom
      LIMIT $4`,
       [normalizeStateSlug(stateSlug), stateName, stateCode, limit]
     );
-    return rows;
+    return rows.filter((row) => isReleasedCityName(stateSlug, row.city));
   });
 }
 
 export async function getStateCompanyPagesWithCategory(stateSlug: string, limit = 5000): Promise<StateCompanyCategoryRow[]> {
   const stateName = stateSlugToName(stateSlug);
   const stateCode = STATE_NAME_TO_CODE[stateName.toLowerCase()] ?? '';
-  return queryWithSnapshot('query_getStateCompanyPagesWithCategory', { stateSlug, limit }, async () => {
+  const releaseVersion = getReleaseVisibilityVersion();
+  return queryWithSnapshot('query_getStateCompanyPagesWithCategory', { stateSlug, limit, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const { rows } = await pool.query<StateCompanyCategoryRow>(
       `SELECT
         cp.slug,
@@ -171,7 +175,7 @@ export async function getStateCompanyPagesWithCategory(stateSlug: string, limit 
       [normalizeStateSlug(stateSlug), stateName, stateCode, limit]
     );
 
-    return rows;
+    return rows.filter((row) => isReleasedCityName(stateSlug, row.city));
   });
 }
 
@@ -246,7 +250,8 @@ export async function getStateCityCounts(stateSlug: string, limit?: number): Pro
     ? [normalizeStateSlug(stateSlug), stateName, stateCode, limit]
     : [normalizeStateSlug(stateSlug), stateName, stateCode];
 
-  return queryWithSnapshot('query_getStateCityCounts', { stateSlug, limit: limit ?? null }, async () => {
+  const releaseVersion = getReleaseVisibilityVersion();
+  return queryWithSnapshot('query_getStateCityCounts', { stateSlug, limit: limit ?? null, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const { rows } = await pool.query<{ city: string; company_count: string }>(
       `SELECT
         CASE
@@ -277,6 +282,7 @@ export async function getStateCityCounts(stateSlug: string, limit?: number): Pro
 
     return Array.from(counts.entries())
       .map(([city, company_count]) => ({ city, company_count }))
+      .filter((row) => isReleasedCityName(stateSlug, row.city))
       .sort((a, b) => b.company_count - a.company_count || a.city.localeCompare(b.city))
       .slice(0, typeof limit === 'number' && limit > 0 ? limit : Number.MAX_SAFE_INTEGER);
   });
@@ -314,7 +320,8 @@ export async function getIndexedStates(): Promise<Array<{ slug: string; name: st
 }
 
 export async function getIndexedStateCitiesMap(): Promise<Record<string, string[]>> {
-  return queryWithSnapshot('query_getIndexedStateCitiesMap', {}, async () => {
+  const releaseVersion = getReleaseVisibilityVersion();
+  return queryWithSnapshot('query_getIndexedStateCitiesMap', { releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
     const allowedStates = new Set(await getIndexedStateSlugs());
 
     const { rows } = await pool.query<{ state: string; city: string }>(
@@ -340,11 +347,18 @@ export async function getIndexedStateCitiesMap(): Promise<Record<string, string[
       const city = normalizeCityForUi(row.city);
       if (city === 'Unknown') continue;
 
+      if (hasReleasedCityControl(stateSlug) && !isReleasedCityName(stateSlug, city)) {
+        continue;
+      }
+
+      const citySlug = toReleasedCitySlug(city);
+      if (!citySlug) continue;
+
       if (!map[stateSlug]) {
         map[stateSlug] = [];
       }
-      if (!map[stateSlug].includes(city)) {
-        map[stateSlug].push(city);
+      if (!map[stateSlug].includes(citySlug)) {
+        map[stateSlug].push(citySlug);
       }
     }
 

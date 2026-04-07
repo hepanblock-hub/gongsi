@@ -16,7 +16,8 @@
     "backfill:ca:osha:names:weak": "node D:\\gongsihegui\\scripts\\backfill_osha_company_names_weak.mjs",
     "backfill:ca:osha:names:strict": "node D:\\gongsihegui\\scripts\\backfill_osha_company_names_strict.mjs",
     "verify:ca:data": "node D:\\gongsihegui\\scripts\\verify_california_data.mjs",
-    "release:sitemap:cities:ca": "node D:\\gongsihegui\\scripts\\release_city_sitemap_batch.mjs --state=california --batch=5"
+    "release:sitemap:cities:ca": "node D:\\gongsihegui\\scripts\\release_city_sitemap_batch.mjs --state=california --batch=2",
+    "release:cities:ca:daily": "powershell -ExecutionPolicy Bypass -File D:\\gongsihegui\\scripts\\release_two_cities_daily.ps1"
   },
   "dependencies": {
     "next": "^15.5.14",
