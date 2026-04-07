@@ -28,7 +28,7 @@ export default function SourcesPage() {
           <p><strong>Agency:</strong> U.S. Department of Labor / OSHA</p>
           <p><strong>Coverage:</strong> inspections, violations, penalties</p>
           <p><strong>Update target:</strong> quarterly</p>
-          <p><a href="https://www.osha.gov/data" target="_blank" rel="noopener noreferrer">Official source</a></p>
+          <p><a href="https://www.osha.gov/data" target="_blank" rel="noopener noreferrer nofollow">Official source</a></p>
         </SectionCard>
 
         <SectionCard title="State Contractor License Boards">

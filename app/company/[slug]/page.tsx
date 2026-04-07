@@ -440,7 +440,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         </p>
         <ul>
           {officialVerificationLinks.map((item) => (
-            <li key={`quick-${item.url}`}><a href={item.url} target="_blank" rel="noopener noreferrer">{item.label}</a></li>
+            <li key={`quick-${item.url}`}><a href={item.url} target="_blank" rel="noopener noreferrer nofollow">{item.label}</a></li>
           ))}
         </ul>
       </SectionCard>
@@ -473,7 +473,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
           />
-          <p><a href={mapOpenUrl} target="_blank" rel="noopener noreferrer">View on Google Maps</a></p>
+          <p><a href={mapOpenUrl} target="_blank" rel="noopener noreferrer nofollow">View on Google Maps</a></p>
         </SectionCard>
       )}
 
@@ -641,7 +641,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
                 Raw source URLs:{' '}
                 {sourceLinks.slice(0, 5).map((url, idx) => (
                   <span key={url}>
-                    <a href={url} target="_blank" rel="noopener noreferrer">Source {idx + 1}</a>
+                    <a href={url} target="_blank" rel="noopener noreferrer nofollow">Source {idx + 1}</a>
                     {idx < Math.min(sourceLinks.length, 5) - 1 ? ' · ' : ''}
                   </span>
                 ))}
@@ -650,7 +650,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
             <p><strong>Verify this record on government source portals:</strong></p>
             <ul>
               {officialVerificationLinks.map((item) => (
-                <li key={item.url}><a href={item.url} target="_blank" rel="noopener noreferrer">{item.label}</a></li>
+                <li key={item.url}><a href={item.url} target="_blank" rel="noopener noreferrer nofollow">{item.label}</a></li>
               ))}
             </ul>
           </SectionCard>
