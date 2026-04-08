@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import MobileNav from './MobileNav';
 import HeaderSearch from './HeaderSearch';
 import { getIndexedStateCitiesMap } from '../../lib/queries';
@@ -20,7 +21,9 @@ export default async function Header() {
       <div className="container header-inner">
         <a href="/" className="brand">Compliance Lookup</a>
 
-        <HeaderSearch states={states} citiesByState={citiesByState} />
+        <Suspense fallback={<div className="header-search" aria-hidden="true" />}>
+          <HeaderSearch states={states} citiesByState={citiesByState} />
+        </Suspense>
 
         <nav className="desktop-nav" aria-label="Primary">
           <ul className="nav-list">

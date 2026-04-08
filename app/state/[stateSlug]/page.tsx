@@ -11,12 +11,11 @@ import { fetchStateSnapshot } from '../../../lib/stateSnapshot';
 
 export const revalidate = 86400;
 export const dynamic = 'force-static';
-export const dynamicParams = false;
+export const dynamicParams = true;
 
 export async function generateStaticParams() {
-  return [
-    { stateSlug: 'california' },
-  ];
+  // 参考 wangzhan：构建期不预渲染，全部按需 ISR
+  return [];
 }
 
 function citySlug(value: string): string {

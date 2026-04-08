@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Breadcrumbs from '../../../../../components/common/Breadcrumbs';
 import PageTitle from '../../../../../components/common/PageTitle';
 import SectionCard from '../../../../../components/common/SectionCard';
-import { getReleasedCityEntries, isReleasedCity } from '../../../../../lib/release';
+import { isReleasedCity } from '../../../../../lib/release';
 import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
 import { stateSlugToName } from '../../../../../lib/site';
 import { fetchCitySnapshot } from '../../../../../lib/citySnapshot';
@@ -13,8 +13,8 @@ export const dynamic = 'force-static';
 export const dynamicParams = true; // 新发布城市走 ISR
 
 export async function generateStaticParams() {
-  const cities = await getReleasedCityEntries('california');
-  return cities.map((city) => ({ stateSlug: 'california', citySlug: city.slug }));
+  // 构建期不预渲染城市页，全部按需 ISR
+  return [];
 }
 
 function normalizeCityName(value: string | null): string {

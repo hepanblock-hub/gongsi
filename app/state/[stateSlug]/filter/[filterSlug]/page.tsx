@@ -9,10 +9,11 @@ import { stateSlugToName } from '../../../../../lib/site';
 
 export const revalidate = 86400;
 export const dynamic = 'force-static';
-export const dynamicParams = false;
+export const dynamicParams = true;
 
 export async function generateStaticParams() {
-  return PRIMARY_FILTER_SLUGS.map((filterSlug) => ({ stateSlug: 'california', filterSlug }));
+  // 构建期不预渲染筛选页，全部按需 ISR
+  return [];
 }
 
 const FILTERS = Object.keys(FILTER_CANONICAL_MAP) as Array<keyof typeof FILTER_CANONICAL_MAP>;
