@@ -36,14 +36,15 @@ function isLocalDatabaseConnection(rawUrl: string | undefined): boolean {
 }
 
 const useLocalConnection = isLocalDatabaseConnection(connectionString);
+const defaultPoolMax = useLocalConnection ? 20 : 1;
 
 export const pool =
   globalForPg.pool ??
   new Pool({
     connectionString,
-    max: Number(process.env.DATABASE_POOL_MAX ?? process.env.PGPOOL_MAX ?? 1),
+    max: Number(process.env.DATABASE_POOL_MAX ?? process.env.PGPOOL_MAX ?? defaultPoolMax),
     idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 10_000,
+    connectionTimeoutMillis: useLocalConnection ? 30_000 : 10_000,
     ssl: useLocalConnection ? false : { rejectUnauthorized: false },
   });
 

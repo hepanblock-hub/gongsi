@@ -1,1 +1,0 @@
-{"generatedAt":"2026-04-07T03:55:44.452Z","namespace":"query_getCompanyTimeline","payload":{"companyName":"R&R HEATING & AIR CONDITIONING INC","state":"CA","limit":12},"data":[{"event_date":"2015-02-02","event_type":"License update","detail":"CLEAR"}]}

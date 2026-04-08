@@ -20,22 +20,35 @@ import {
   getRegistrationsByCompany,
 } from '../../../lib/queries';
 import { companyPathFromSlug, formatDate, formatMoney, normalizeStateSlug, SITE_URL } from '../../../lib/site';
+import { fetchCompanySnapshot } from '../../../lib/companySnapshot';
 
 export const revalidate = 86400;
+export const dynamicParams = true; // 未预渲染的页面按需渲染（ISR）
 
 export async function generateStaticParams() {
-  return [
-    'saf-flc-ca',
-    'v-t-tooling-ca',
-    'wellah-aesthetics-med-spa-ca',
-    'wunder-bar-ca',
-    'xbp-global-holdings-ca',
-    'swim-care-pool-services-ca',
-    'r-r-heating-air-conditioning-ca',
-    'guevara-s-painting-ca',
-    'bear-fence-enterprises-ca',
-    'wesco-ca',
-  ].map((slug) => ({ slug }));
+  // 只预渲染已发布城市的公司，其余页面走 ISR（snapshot 保证首次也快）
+  const { releasedCitySlugSet } = await import('../../../lib/release');
+  const { pool } = await import('../../../lib/db');
+  try {
+    const citySet = await releasedCitySlugSet('california');
+    if (citySet.size === 0) return [];
+    // 拉全部 CA 公司页，过滤已发布城市
+    const { rows } = await pool.query<{ slug: string; city: string | null }>(
+      `SELECT slug, city FROM company_pages
+       WHERE state = 'CA'
+         AND company_name ~* '[A-Za-z]'
+         AND lower(trim(company_name)) <> '- select -'
+       ORDER BY id ASC`
+    );
+    return rows
+      .filter((r) => {
+        const cs = (r.city ?? '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        return citySet.has(cs);
+      })
+      .map((r) => ({ slug: r.slug.replace(/^\/company\//, '') }));
+  } catch {
+    return [];
+  }
 }
 
 const STATE_CODE_TO_NAME: Record<string, string> = {
@@ -220,7 +233,10 @@ function toCitySlug(value: string): string {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const fullSlug = companyPathFromSlug(slug);
-  const routePage = await getCompanyBySlugForRouting(fullSlug);
+
+  // ── 优先读快照（Supabase Storage），快照不存在时降级查 DB ──
+  const snapshot = await fetchCompanySnapshot(slug);
+  const routePage = snapshot?.routing ?? await getCompanyBySlugForRouting(fullSlug);
 
   if (!routePage) return { title: 'Company not found' };
   if (!(await isReleasedCompanyLocation(routePage.state, routePage.city))) {
@@ -231,16 +247,18 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     };
   }
 
-  const page = await getCompanyBySlug(fullSlug);
+  const page = snapshot?.detail ?? await getCompanyBySlug(fullSlug);
   if (!page) return { title: 'Company not found' };
   const entityLooksReal = isLikelyRealCompanyName(page.company_name);
   const stateName = fullStateName(page.state);
   const stateCode = Object.entries(STATE_CODE_TO_NAME).find(([, v]) => v === stateName)?.[0] ?? stateName;
-  const [osha, licenses, registrations] = await Promise.all([
-    getOshaByCompany(page.company_name, page.state, 1),
-    getLicensesByCompany(page.company_name, page.state, 1),
-    getRegistrationsByCompany(page.company_name, page.state, 1),
-  ]);
+  const [osha, licenses, registrations] = snapshot
+    ? [snapshot.osha, snapshot.licenses, snapshot.registrations]
+    : await Promise.all([
+        getOshaByCompany(page.company_name, page.state, 200),
+        getLicensesByCompany(page.company_name, page.state, 200),
+        getRegistrationsByCompany(page.company_name, page.state, 200),
+      ]);
 
   const hasOsha = osha.length > 0;
   const hasLicense = licenses.length > 0;
@@ -302,32 +320,40 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function CompanyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const fullSlug = companyPathFromSlug(slug);
-  const routePage = await getCompanyBySlugForRouting(fullSlug);
+
+  // ── 优先读快照（Supabase Storage），快照不存在时降级查 DB ──
+  const snapshot = await fetchCompanySnapshot(slug);
+  const routePage = snapshot?.routing ?? await getCompanyBySlugForRouting(fullSlug);
 
   if (!routePage) notFound();
   if (!(await isReleasedCompanyLocation(routePage.state, routePage.city))) {
     redirect(`/state/${normalizeStateSlug(routePage.state)}`);
   }
 
-  const page = await getCompanyBySlug(fullSlug);
-
+  const page = snapshot?.detail ?? await getCompanyBySlug(fullSlug);
   if (!page) notFound();
 
-  const [osha, licenses, registrations] = await Promise.all([
-    getOshaByCompany(page.company_name, page.state, 200),
-    getLicensesByCompany(page.company_name, page.state, 200),
-    getRegistrationsByCompany(page.company_name, page.state, 200),
-  ]);
+  const [osha, licenses, registrations] = snapshot
+    ? [snapshot.osha, snapshot.licenses, snapshot.registrations]
+    : await Promise.all([
+        getOshaByCompany(page.company_name, page.state, 200),
+        getLicensesByCompany(page.company_name, page.state, 200),
+        getRegistrationsByCompany(page.company_name, page.state, 200),
+      ]);
 
-  const [timeline, related] = await Promise.all([
-    getCompanyTimeline(page.company_name, page.state, 12),
-    getRelatedCompanies(page.company_name, page.state, page.city, 6, page.slug),
-  ]);
+  const [timeline, related] = snapshot
+    ? [snapshot.timeline, snapshot.related]
+    : await Promise.all([
+        getCompanyTimeline(page.company_name, page.state, 12),
+        getRelatedCompanies(page.company_name, page.state, page.city, 6, page.slug),
+      ]);
 
-  const [detailedLocation, cityBenchmark] = await Promise.all([
-    getCompanyDetailedLocation(page.company_name, page.state),
-    getCityComplianceBenchmark(page.state, page.city),
-  ]);
+  const [detailedLocation, cityBenchmark] = snapshot
+    ? [snapshot.location, snapshot.benchmark]
+    : await Promise.all([
+        getCompanyDetailedLocation(page.company_name, page.state),
+        getCityComplianceBenchmark(page.state, page.city),
+      ]);
 
   const latestInspection = osha[0]?.inspection_date ?? null;
   const latestLicenseStatus = licenses[0]?.status ?? 'unknown';
@@ -642,7 +668,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
 
           <SectionCard title="Timeline">
             <ul className="timeline-list">
-              {timeline.map((item, idx) => (
+              {(timeline ?? []).map((item, idx) => (
                 <li key={`${item.event_type}-${item.event_date}-${idx}`}>
                   <strong>{formatDate(item.event_date)}</strong> · {item.event_type}
                   {item.detail && item.detail !== 'Inspection record' ? ` · ${item.detail}` : ''}
@@ -704,7 +730,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
 
           <SectionCard title="Related companies">
             <ul>
-              {related.map((c) => (
+              {(related ?? []).map((c) => (
                 <li key={c.slug}><a href={c.slug}>{c.company_name}</a></li>
               ))}
             </ul>

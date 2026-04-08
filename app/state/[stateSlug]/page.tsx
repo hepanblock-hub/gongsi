@@ -9,6 +9,8 @@ import { getStateCityCounts, getStateCompanyPagesWithCategory, getStateSummary, 
 import { SITE_URL, stateSlugToName } from '../../../lib/site';
 
 export const revalidate = 86400;
+export const dynamic = 'force-static';
+export const dynamicParams = false;
 
 export async function generateStaticParams() {
   return [

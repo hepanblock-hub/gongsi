@@ -19,3 +19,4 @@ tmp_*.sql
 dev*.log
 scripts/prod_server*.log
 public/page_snapshots/capture.log
+kuaizhao/

@@ -8,6 +8,8 @@ import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '
 import { stateSlugToName } from '../../../../../lib/site';
 
 export const revalidate = 86400;
+export const dynamic = 'force-static';
+export const dynamicParams = false;
 
 export async function generateStaticParams() {
   return PRIMARY_FILTER_SLUGS.map((filterSlug) => ({ stateSlug: 'california', filterSlug }));
@@ -235,7 +237,11 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
   }
 
   const stateName = stateSlugToName(stateSlug);
-  let companies = await getStateCompanyPagesWithCategory(stateSlug, 5000);
+  
+  // 优先尝试从快照读取筛选数据
+  const { fetchFilterSnapshot } = await import('../../../../../lib/filterSnapshot');
+  const filterSnapshot = await fetchFilterSnapshot(stateSlug, normalizedFilterSlug);
+  let companies = filterSnapshot?.companies ?? await getStateCompanyPagesWithCategory(stateSlug, 5000);
 
   if (normalizedFilterSlug === 'full-profiles' || normalizedFilterSlug === 'partial-profiles' || normalizedFilterSlug === 'osha-only' || normalizedFilterSlug === 'license-only' || normalizedFilterSlug === 'registration-only' || normalizedFilterSlug === 'basic-listings') {
     const categoryTarget = normalizedFilterSlug === 'full-profiles'

@@ -17,7 +17,20 @@
     "backfill:ca:osha:names:strict": "node D:\\gongsihegui\\scripts\\backfill_osha_company_names_strict.mjs",
     "verify:ca:data": "node D:\\gongsihegui\\scripts\\verify_california_data.mjs",
     "release:sitemap:cities:ca": "node D:\\gongsihegui\\scripts\\release_city_sitemap_batch.mjs --state=california --batch=2",
-    "release:cities:ca:daily": "powershell -ExecutionPolicy Bypass -File D:\\gongsihegui\\scripts\\release_two_cities_daily.ps1"
+    "release:cities:ca:daily": "powershell -ExecutionPolicy Bypass -File D:\\gongsihegui\\scripts\\release_two_cities_daily.ps1",
+    "gen:snapshots": "npx tsx scripts/gen_snapshots.ts",
+    "gen:snapshots:home": "cross-env SNAPSHOT_SKIP_COMPANY=true SNAPSHOT_SKIP_STATE=true SNAPSHOT_SKIP_CITY=true SNAPSHOT_SKIP_FILTER=true npx tsx scripts/gen_snapshots.ts",
+    "gen:snapshots:company": "cross-env SNAPSHOT_SKIP_HOME=true SNAPSHOT_SKIP_STATE=true SNAPSHOT_SKIP_CITY=true SNAPSHOT_SKIP_FILTER=true npx tsx scripts/gen_snapshots.ts",
+    "gen:snapshots:state": "cross-env SNAPSHOT_SKIP_HOME=true SNAPSHOT_SKIP_COMPANY=true SNAPSHOT_SKIP_CITY=true SNAPSHOT_SKIP_FILTER=true npx tsx scripts/gen_snapshots.ts",
+    "gen:snapshots:city": "cross-env SNAPSHOT_SKIP_HOME=true SNAPSHOT_SKIP_COMPANY=true SNAPSHOT_SKIP_STATE=true SNAPSHOT_SKIP_FILTER=true npx tsx scripts/gen_snapshots.ts",
+    "gen:snapshots:filter": "cross-env SNAPSHOT_SKIP_HOME=true SNAPSHOT_SKIP_COMPANY=true SNAPSHOT_SKIP_STATE=true SNAPSHOT_SKIP_CITY=true npx tsx scripts/gen_snapshots.ts",
+    "gen:snapshots:all": "npx tsx scripts/gen_snapshots.ts",
+    "gen:snapshots:structured": "node D:\\gongsihegui\\scripts\\build_structured_snapshots.mjs",
+    "gen:snapshots:fullrender": "node D:\\gongsihegui\\scripts\\build_full_render_snapshots.mjs",
+    "upload:snapshots": "npx tsx scripts/upload-snapshots.ts",
+    "upload:snapshots:all": "cross-env SNAPSHOT_UPLOAD_SUBDIRS=company,state,city,filter,root npx tsx scripts/upload-snapshots.ts",
+    "upload:snapshots:force": "cross-env SNAPSHOT_UPLOAD_UPSERT=true SNAPSHOT_UPLOAD_SUBDIRS=company,state,city,filter,root npx tsx scripts/upload-snapshots.ts",
+    "gen:snapshots:city-filter": "npx tsx scripts/gen_city_filter_snapshots.ts"
   },
   "dependencies": {
     "next": "^15.5.14",
@@ -30,6 +43,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "19.0.12",
     "@types/react-dom": "19.0.5",
+    "cross-env": "^10.1.0",
     "typescript": "5.8.3"
   }
 }

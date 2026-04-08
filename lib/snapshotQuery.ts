@@ -13,6 +13,11 @@ function snapshotRoot(): string {
   return process.env.SNAPSHOT_DATA_ROOT ?? path.join(process.cwd(), 'kuaizhao', 'data');
 }
 
+function snapshotsDisabled(): boolean {
+  const v = (process.env.SNAPSHOT_DISABLE ?? '').toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
 function sanitizeNamespace(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
@@ -46,6 +51,10 @@ export async function queryWithSnapshot<T>(
   payload: unknown,
   dbFetcher: () => Promise<T>
 ): Promise<T> {
+  if (snapshotsDisabled()) {
+    return dbFetcher();
+  }
+
   const root = snapshotRoot();
   const safeNamespace = sanitizeNamespace(namespace);
   const payloadHash = hashPayload(payload);

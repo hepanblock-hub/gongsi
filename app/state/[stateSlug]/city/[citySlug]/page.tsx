@@ -8,6 +8,8 @@ import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '
 import { stateSlugToName } from '../../../../../lib/site';
 
 export const revalidate = 86400;
+export const dynamic = 'force-static';
+export const dynamicParams = true; // 新发布城市走 ISR
 
 export async function generateStaticParams() {
   const cities = await getReleasedCityEntries('california');

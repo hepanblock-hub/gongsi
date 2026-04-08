@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS city_release_control (
 );
 `;
 
+function releaseControlDisabled(): boolean {
+  const raw = (process.env.RELEASE_CONTROL_MODE ?? process.env.RELEASE_IGNORE ?? '').toLowerCase().trim();
+  return raw === 'all' || raw === 'disabled' || raw === 'off' || raw === '1' || raw === 'true';
+}
+
 let ensured = false;
 let ensurePromise: Promise<void> | null = null;
 
@@ -69,10 +74,12 @@ async function loadReleasedCityMap(): Promise<ReleasedCityMap> {
 }
 
 export async function getReleaseVisibilityVersion(): Promise<string> {
+  if (releaseControlDisabled()) return 'release-control:disabled';
   return JSON.stringify(await loadReleasedCityMap());
 }
 
 export async function getReleasedCityEntries(stateSlug: string): Promise<ReleasedCityEntry[]> {
+  if (releaseControlDisabled()) return [];
   const map = await loadReleasedCityMap();
   return map[normalizeStateSlug(stateSlug)] ?? [];
 }
