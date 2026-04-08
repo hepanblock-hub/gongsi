@@ -6,6 +6,7 @@ import SectionCard from '../../../../../components/common/SectionCard';
 import { getReleasedCityEntries, isReleasedCity } from '../../../../../lib/release';
 import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
 import { stateSlugToName } from '../../../../../lib/site';
+import { fetchCitySnapshot } from '../../../../../lib/citySnapshot';
 
 export const revalidate = 86400;
 export const dynamic = 'force-static';
@@ -124,10 +125,20 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
   const { stateSlug, citySlug: targetCitySlug } = await params;
   if (!(await isReleasedCity(stateSlug, targetCitySlug))) redirect(`/state/${stateSlug}/cities`);
   const stateName = stateSlugToName(stateSlug);
-  const allCompanies = await getStateCompanyPagesWithCategory(stateSlug, 5000);
-  const companies = allCompanies
-    .filter((c) => citySlug(normalizeCityName(c.city)) === targetCitySlug)
-    .sort(compareCompanies);
+  const citySnapshot = await fetchCitySnapshot(stateSlug, targetCitySlug);
+
+  const companies: StateCompanyCategoryRow[] = citySnapshot?.companies?.length
+    ? citySnapshot.companies
+      .map((c) => ({
+        ...c,
+        injury_count: c.injury_count ?? 0,
+        latest_inspection_date: c.latest_inspection_date ?? null,
+        license_status: c.license_status ?? null,
+      }))
+      .sort(compareCompanies)
+    : (await getStateCompanyPagesWithCategory(stateSlug, 5000))
+      .filter((c) => citySlug(normalizeCityName(c.city)) === targetCitySlug)
+      .sort(compareCompanies);
 
   if (!companies.length) notFound();
 

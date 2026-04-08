@@ -25,6 +25,7 @@ export interface StateSnapshot {
     osha_count: number;
     injury_count: number;
     license_status: string | null;
+    latest_inspection_date: string | null;
   }>;
   cityCounts: Array<{
     city: string;

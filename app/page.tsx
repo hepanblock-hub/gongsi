@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import PageTitle from '../components/common/PageTitle';
 import SectionCard from '../components/common/SectionCard';
 import { getRecentCompanyPages } from '../lib/queries';
+import { fetchRecentSnapshot } from '../lib/rootSnapshot';
 
 function recordTypeLabel(hasOsha: boolean, hasLicense: boolean, hasRegistration: boolean): string {
   const count = [hasOsha, hasLicense, hasRegistration].filter(Boolean).length;
@@ -22,7 +23,12 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   let rows = [] as Awaited<ReturnType<typeof getRecentCompanyPages>>;
   try {
-    rows = await getRecentCompanyPages(30);
+    const snapshot = await fetchRecentSnapshot();
+    if (snapshot?.data?.length) {
+      rows = snapshot.data;
+    } else {
+      rows = await getRecentCompanyPages(30);
+    }
   } catch {
     rows = [];
   }

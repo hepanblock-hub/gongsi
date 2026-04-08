@@ -7,6 +7,7 @@ import BreadcrumbJsonLd from '../../../components/seo/BreadcrumbJsonLd';
 import { canonicalCityPath, canonicalFilterPath } from '../../../lib/indexing';
 import { getStateCityCounts, getStateCompanyPagesWithCategory, getStateSummary, type StateCompanyCategoryRow } from '../../../lib/queries';
 import { SITE_URL, stateSlugToName } from '../../../lib/site';
+import { fetchStateSnapshot } from '../../../lib/stateSnapshot';
 
 export const revalidate = 86400;
 export const dynamic = 'force-static';
@@ -103,9 +104,30 @@ export default async function StatePage({
 }) {
   const { stateSlug } = await params;
 
-  const summary = await getStateSummary(stateSlug);
-  const allCompanies = await getStateCompanyPagesWithCategory(stateSlug, 5000);
-  const cityCounts = await getStateCityCounts(stateSlug);
+  const snapshot = await fetchStateSnapshot(stateSlug);
+
+  const summary = snapshot
+    ? {
+      state: stateSlugToName(stateSlug),
+      company_count: snapshot.summary.company_count,
+      osha_count: snapshot.summary.osha_count,
+      license_count: snapshot.summary.license_count,
+      registration_count: snapshot.summary.registration_count,
+    }
+    : await getStateSummary(stateSlug);
+
+  const allCompanies: StateCompanyCategoryRow[] = snapshot
+    ? snapshot.companyPages.map((c) => ({
+      ...c,
+      injury_count: c.injury_count ?? 0,
+      latest_inspection_date: c.latest_inspection_date ?? null,
+      license_status: c.license_status ?? null,
+    }))
+    : await getStateCompanyPagesWithCategory(stateSlug, 5000);
+
+  const cityCounts = snapshot
+    ? snapshot.cityCounts
+    : await getStateCityCounts(stateSlug);
 
   const companiesBySearch = allCompanies;
   const companies = companiesBySearch;
@@ -121,21 +143,26 @@ export default async function StatePage({
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name));
   const topCityTotal = cityCounts.slice(0, 30).reduce((acc, row) => acc + row.company_count, 0);
 
-  const categoryCount = {
-    full: companiesBySearch.filter((c) => categoryOfCompany(c) === 'full').length,
-    partial: companiesBySearch.filter((c) => categoryOfCompany(c) === 'partial').length,
-    oshaOnly: companiesBySearch.filter((c) => categoryOfCompany(c) === 'osha-only').length,
-    licenseOnly: companiesBySearch.filter((c) => categoryOfCompany(c) === 'license-only').length,
-    registrationOnly: companiesBySearch.filter((c) => categoryOfCompany(c) === 'registration-only').length,
-    basic: companiesBySearch.filter((c) => categoryOfCompany(c) === 'basic').length,
-  };
+  const categoryCount = snapshot?.stats?.categoryCount
+    ? snapshot.stats.categoryCount
+    : {
+      full: companiesBySearch.filter((c) => categoryOfCompany(c) === 'full').length,
+      partial: companiesBySearch.filter((c) => categoryOfCompany(c) === 'partial').length,
+      oshaOnly: companiesBySearch.filter((c) => categoryOfCompany(c) === 'osha-only').length,
+      licenseOnly: companiesBySearch.filter((c) => categoryOfCompany(c) === 'license-only').length,
+      registrationOnly: companiesBySearch.filter((c) => categoryOfCompany(c) === 'registration-only').length,
+      basic: companiesBySearch.filter((c) => categoryOfCompany(c) === 'basic').length,
+    };
 
-  const analyzedBase = Math.max(1, companiesBySearch.length);
-  const oshaCoveragePct = ((companiesBySearch.filter((c) => c.has_osha).length / analyzedBase) * 100).toFixed(1);
-  const licenseCoveragePct = ((companiesBySearch.filter((c) => c.has_license).length / analyzedBase) * 100).toFixed(1);
-  const registrationCoveragePct = ((companiesBySearch.filter((c) => c.has_registration).length / analyzedBase) * 100).toFixed(1);
-  const fullProfilePct = ((categoryCount.full / analyzedBase) * 100).toFixed(1);
-  const partialProfilePct = ((categoryCount.partial / analyzedBase) * 100).toFixed(1);
+  const analyzedBase = snapshot?.stats?.analyzed_company_count ?? Math.max(1, companiesBySearch.length);
+  const oshaCoveragePct = snapshot?.stats?.oshaCoveragePct?.toFixed(1)
+    ?? ((companiesBySearch.filter((c) => c.has_osha).length / analyzedBase) * 100).toFixed(1);
+  const licenseCoveragePct = snapshot?.stats?.licenseCoveragePct?.toFixed(1)
+    ?? ((companiesBySearch.filter((c) => c.has_license).length / analyzedBase) * 100).toFixed(1);
+  const registrationCoveragePct = snapshot?.stats?.registrationCoveragePct?.toFixed(1)
+    ?? ((companiesBySearch.filter((c) => c.has_registration).length / analyzedBase) * 100).toFixed(1);
+  const fullProfilePct = ((categoryCount.full / Math.max(1, analyzedBase)) * 100).toFixed(1);
+  const partialProfilePct = ((categoryCount.partial / Math.max(1, analyzedBase)) * 100).toFixed(1);
 
   if (!companies.length) {
     notFound();

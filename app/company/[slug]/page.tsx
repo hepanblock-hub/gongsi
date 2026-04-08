@@ -26,29 +26,8 @@ export const revalidate = 86400;
 export const dynamicParams = true; // 未预渲染的页面按需渲染（ISR）
 
 export async function generateStaticParams() {
-  // 只预渲染已发布城市的公司，其余页面走 ISR（snapshot 保证首次也快）
-  const { releasedCitySlugSet } = await import('../../../lib/release');
-  const { pool } = await import('../../../lib/db');
-  try {
-    const citySet = await releasedCitySlugSet('california');
-    if (citySet.size === 0) return [];
-    // 拉全部 CA 公司页，过滤已发布城市
-    const { rows } = await pool.query<{ slug: string; city: string | null }>(
-      `SELECT slug, city FROM company_pages
-       WHERE state = 'CA'
-         AND company_name ~* '[A-Za-z]'
-         AND lower(trim(company_name)) <> '- select -'
-       ORDER BY id ASC`
-    );
-    return rows
-      .filter((r) => {
-        const cs = (r.city ?? '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        return citySet.has(cs);
-      })
-      .map((r) => ({ slug: r.slug.replace(/^\/company\//, '') }));
-  } catch {
-    return [];
-  }
+  // 参考 wangzhan：避免构建期生成过多动态路由，全部改为按需 ISR
+  return [];
 }
 
 const STATE_CODE_TO_NAME: Record<string, string> = {
