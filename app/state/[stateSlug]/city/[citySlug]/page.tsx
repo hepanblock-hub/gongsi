@@ -102,7 +102,8 @@ function inferIndustryTag(companyName: string): string {
 
 export async function generateMetadata({ params }: { params: Promise<{ stateSlug: string; citySlug: string }> }): Promise<Metadata> {
   const { stateSlug, citySlug } = await params;
-  if (!(await isReleasedCity(stateSlug, citySlug))) {
+  const citySnapshot = await fetchCitySnapshot(stateSlug, citySlug);
+  if (!citySnapshot && !(await isReleasedCity(stateSlug, citySlug))) {
     return {
       title: { absolute: 'City records | Compliance Lookup' },
       robots: { index: false, follow: false },
@@ -123,9 +124,9 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
 
 export default async function StateCityPage({ params }: { params: Promise<{ stateSlug: string; citySlug: string }> }) {
   const { stateSlug, citySlug: targetCitySlug } = await params;
-  if (!(await isReleasedCity(stateSlug, targetCitySlug))) redirect(`/state/${stateSlug}/cities`);
-  const stateName = stateSlugToName(stateSlug);
   const citySnapshot = await fetchCitySnapshot(stateSlug, targetCitySlug);
+  if (!citySnapshot && !(await isReleasedCity(stateSlug, targetCitySlug))) redirect(`/state/${stateSlug}/cities`);
+  const stateName = stateSlugToName(stateSlug);
 
   const companies: StateCompanyCategoryRow[] = citySnapshot?.companies?.length
     ? citySnapshot.companies

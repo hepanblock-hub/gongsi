@@ -51,6 +51,8 @@ function getBaseUrl(): string | null {
   return process.env.STATE_SNAPSHOT_BASE_URL?.replace(/\/$/, '') ?? null;
 }
 
+const SNAPSHOT_DEBUG = process.env.SNAPSHOT_DEBUG === 'true';
+
 /**
  * 从 Supabase Storage 读取州快照
  */
@@ -63,9 +65,14 @@ export async function fetchStateSnapshot(stateSlug: string): Promise<StateSnapsh
     const res = await fetch(url, {
       next: { revalidate: 86400 },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (SNAPSHOT_DEBUG) console.info(`[snapshot-miss] state/${stateSlug}.json status=${res.status}`);
+      return null;
+    }
+    if (SNAPSHOT_DEBUG) console.info(`[snapshot-hit] state/${stateSlug}.json`);
     return (await res.json()) as StateSnapshot;
   } catch {
+    if (SNAPSHOT_DEBUG) console.info(`[snapshot-miss] state/${stateSlug}.json error`);
     return null;
   }
 }

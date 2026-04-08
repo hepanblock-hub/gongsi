@@ -27,6 +27,8 @@ function getBaseUrl(): string | null {
   return process.env.CITY_SNAPSHOT_BASE_URL?.replace(/\/$/, '') ?? null;
 }
 
+const SNAPSHOT_DEBUG = process.env.SNAPSHOT_DEBUG === 'true';
+
 /**
  * 从 Supabase Storage 读取城市快照
  */
@@ -42,9 +44,14 @@ export async function fetchCitySnapshot(
     const res = await fetch(url, {
       next: { revalidate: 86400 },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (SNAPSHOT_DEBUG) console.info(`[snapshot-miss] city/${stateSlug}/${citySlug}.json status=${res.status}`);
+      return null;
+    }
+    if (SNAPSHOT_DEBUG) console.info(`[snapshot-hit] city/${stateSlug}/${citySlug}.json`);
     return (await res.json()) as CitySnapshot;
   } catch {
+    if (SNAPSHOT_DEBUG) console.info(`[snapshot-miss] city/${stateSlug}/${citySlug}.json error`);
     return null;
   }
 }

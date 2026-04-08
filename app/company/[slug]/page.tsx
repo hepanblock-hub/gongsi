@@ -218,7 +218,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const routePage = snapshot?.routing ?? await getCompanyBySlugForRouting(fullSlug);
 
   if (!routePage) return { title: 'Company not found' };
-  if (!(await isReleasedCompanyLocation(routePage.state, routePage.city))) {
+  if (!snapshot && !(await isReleasedCompanyLocation(routePage.state, routePage.city))) {
     return {
       title: { absolute: 'Company records | Compliance Lookup' },
       robots: { index: false, follow: false },
@@ -305,7 +305,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
   const routePage = snapshot?.routing ?? await getCompanyBySlugForRouting(fullSlug);
 
   if (!routePage) notFound();
-  if (!(await isReleasedCompanyLocation(routePage.state, routePage.city))) {
+  if (!snapshot && !(await isReleasedCompanyLocation(routePage.state, routePage.city))) {
     redirect(`/state/${normalizeStateSlug(routePage.state)}`);
   }
 

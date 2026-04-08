@@ -64,6 +64,8 @@ function getBaseUrl(): string | null {
   return process.env.COMPANY_SNAPSHOT_BASE_URL?.replace(/\/$/, '') ?? null;
 }
 
+const SNAPSHOT_DEBUG = process.env.SNAPSHOT_DEBUG === 'true';
+
 /**
  * 从 Supabase Storage 读取公司快照
  * @returns 快照数据，若未找到或未配置则返回 null
@@ -83,11 +85,14 @@ export async function fetchCompanySnapshot(slug: string): Promise<CompanySnapsho
         next: { revalidate: 86400 },
       });
       if (!res.ok) continue;
+      if (SNAPSHOT_DEBUG) console.info(`[snapshot-hit] company/${candidate}.json`);
       return (await res.json()) as CompanySnapshot;
     } catch {
       continue;
     }
   }
+
+  if (SNAPSHOT_DEBUG) console.info(`[snapshot-miss] company/${cleanSlug}.json`);
 
   return null;
 }
