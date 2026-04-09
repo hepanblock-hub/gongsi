@@ -12,7 +12,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
-import { sanitizeSnapshotSlug } from '../lib/snapshotKey';
 
 const ROOT      = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_ROOT = process.env.SNAPSHOT_DATA_ROOT ?? path.join(ROOT, 'kuaizhao', 'data');
@@ -134,96 +133,122 @@ async function writeJson(filePath: string, data: unknown) {
   await fs.writeFile(filePath, JSON.stringify(data), 'utf8');
 }
 
-// ─── 从 company 快照推导 StateCompanyCategoryRow ─────────────────────────────
+// ─── 从数据库直接聚合生成 StateCompanyCategoryRow ───────────────────────────
 
-type RawSnapshot = {
-  slug: string;
-  osha: Array<{ severity?: string | null; inspection_date?: string | null }>;
-  licenses: Array<{ status?: string | null; issue_date?: string | null }>;
-  registrations: Array<{ incorporation_date?: string | null }>;
+const STATE_SLUG_TO_CODES: Record<string, string[]> = {
+  california: ['ca', 'california'],
+  florida: ['fl', 'florida'],
 };
 
-function snapshotToCategory(
-  base: { slug: string; company_name: string; state: string; city: string | null; updated_at: string | null },
-  snap: RawSnapshot | null,
-): Company {
-  const osha = snap?.osha ?? [];
-  const licenses = snap?.licenses ?? [];
-  const registrations = snap?.registrations ?? [];
-
-  const injuryOsha = osha.filter(o =>
-    o.severity && (/^injury_count:\d+$/i.test(o.severity) || /^fatality:\d+$/i.test(o.severity))
-  );
-
-  const latestLicense = licenses.sort((a, b) => {
-    const da = a.issue_date ? new Date(a.issue_date).getTime() : 0;
-    const db2 = b.issue_date ? new Date(b.issue_date).getTime() : 0;
-    return db2 - da;
-  })[0];
-
-  return {
-    slug:           base.slug,
-    company_name:   base.company_name,
-    state:          base.state,
-    city:           base.city,
-    updated_at:     base.updated_at ?? null,
-    has_osha:       osha.length > 0,
-    has_license:    licenses.length > 0,
-    has_registration: registrations.length > 0,
-    osha_count:     osha.length,
-    injury_count:   injuryOsha.length,
-    license_status: latestLicense?.status ?? null,
-    latest_inspection_date: osha[0]?.inspection_date ?? null,
-  };
+function getStateCodes(stateSlug: string): string[] {
+  return STATE_SLUG_TO_CODES[stateSlug] ?? [stateSlug];
 }
 
-async function loadCompaniesFromSnapshots(stateSlug: string): Promise<Company[]> {
-  const companyDir = path.join(DATA_ROOT, 'company');
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL ?? 'postgresql://gongsi_admin:gongsi_pass_2026@localhost:54333/gongsihegui_db' });
+async function loadCompaniesFromDatabase(stateSlug: string): Promise<Company[]> {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL ?? 'postgresql://gongsi_admin:gongsi_pass_2026@localhost:54333/gongsihegui_db'
+  });
 
-  const caWhere = "(lower(trim(state)) IN ('ca','california') OR lower(regexp_replace(state, '\\s+', '-', 'g'))='california')";
-  const sql = stateSlug === 'california'
-    ? `SELECT slug, company_name, state, city, updated_at::text FROM company_pages WHERE ${caWhere} AND company_name ~* '[A-Za-z]' AND lower(trim(company_name)) <> '- select -' ORDER BY id ASC`
-    : `SELECT slug, company_name, state, city, updated_at::text FROM company_pages WHERE lower(regexp_replace(state, '\\s+', '-', 'g'))=$1 AND company_name ~* '[A-Za-z]' AND lower(trim(company_name)) <> '- select -' ORDER BY id ASC`;
-
-  const { rows } = stateSlug === 'california'
-    ? await pool.query<{ slug: string; company_name: string; state: string; city: string | null; updated_at: string | null }>(sql)
-    : await pool.query<{ slug: string; company_name: string; state: string; city: string | null; updated_at: string | null }>(sql, [stateSlug]);
+  const stateCodes = getStateCodes(stateSlug);
+  const { rows } = await pool.query<Company>(
+    `WITH filtered_companies AS (
+       SELECT
+         replace(regexp_replace(cp.slug, '^/?company/', ''), '\\', '') AS slug,
+         cp.company_name,
+         cp.state,
+         cp.city,
+         cp.updated_at::text AS updated_at,
+         normalize_company_name(cp.company_name) AS normalized_name
+       FROM company_pages cp
+       WHERE cp.company_name ~* '[A-Za-z]'
+         AND lower(trim(cp.company_name)) <> '- select -'
+         AND (
+           lower(trim(cp.state)) = ANY($1::text[])
+           OR lower(regexp_replace(cp.state, '\\s+', '-', 'g')) = ANY($1::text[])
+         )
+     ),
+     osha_counts AS (
+       SELECT
+         oi.normalized_name,
+         COUNT(*) FILTER (WHERE oi.inspection_date IS NOT NULL)::int AS osha_count,
+         COUNT(*) FILTER (
+           WHERE oi.inspection_date IS NOT NULL
+             AND (
+               oi.severity ~ '^injury_count:[0-9]+$'
+               OR oi.severity ~ '^fatality:[0-9]+$'
+             )
+         )::int AS injury_count,
+         MAX(oi.inspection_date)::text AS latest_inspection_date
+       FROM osha_inspections oi
+       WHERE (
+         lower(trim(oi.state)) = ANY($1::text[])
+         OR lower(regexp_replace(oi.state, '\\s+', '-', 'g')) = ANY($1::text[])
+       )
+       GROUP BY oi.normalized_name
+     ),
+     license_counts AS (
+       SELECT
+         cl.normalized_name,
+         COUNT(*) FILTER (WHERE cl.issue_date IS NOT NULL)::int AS license_count
+       FROM contractor_licenses cl
+       WHERE (
+         lower(trim(cl.state)) = ANY($1::text[])
+         OR lower(regexp_replace(cl.state, '\\s+', '-', 'g')) = ANY($1::text[])
+       )
+       GROUP BY cl.normalized_name
+     ),
+     latest_license AS (
+       SELECT DISTINCT ON (cl.normalized_name)
+         cl.normalized_name,
+         cl.status AS license_status
+       FROM contractor_licenses cl
+       WHERE (
+         lower(trim(cl.state)) = ANY($1::text[])
+         OR lower(regexp_replace(cl.state, '\\s+', '-', 'g')) = ANY($1::text[])
+       )
+       ORDER BY cl.normalized_name, cl.issue_date DESC NULLS LAST, cl.created_at DESC
+     ),
+     registration_counts AS (
+       SELECT
+         cr.normalized_name,
+         COUNT(*) FILTER (WHERE cr.incorporation_date IS NOT NULL)::int AS registration_count
+       FROM company_registrations cr
+       WHERE (
+         lower(trim(cr.state)) = ANY($1::text[])
+         OR lower(regexp_replace(cr.state, '\\s+', '-', 'g')) = ANY($1::text[])
+       )
+       GROUP BY cr.normalized_name
+     )
+     SELECT
+       fc.slug,
+       fc.company_name,
+       fc.state,
+       fc.city,
+       (COALESCE(oc.osha_count, 0) > 0) AS has_osha,
+       (COALESCE(lc.license_count, 0) > 0) AS has_license,
+       (COALESCE(rc.registration_count, 0) > 0) AS has_registration,
+       COALESCE(oc.osha_count, 0) AS osha_count,
+       COALESCE(oc.injury_count, 0) AS injury_count,
+       ll.license_status,
+       fc.updated_at,
+       oc.latest_inspection_date
+     FROM filtered_companies fc
+     LEFT JOIN osha_counts oc ON oc.normalized_name = fc.normalized_name
+     LEFT JOIN license_counts lc ON lc.normalized_name = fc.normalized_name
+     LEFT JOIN latest_license ll ON ll.normalized_name = fc.normalized_name
+     LEFT JOIN registration_counts rc ON rc.normalized_name = fc.normalized_name
+     ORDER BY fc.company_name ASC`,
+    [stateCodes]
+  );
 
   await pool.end();
-
-  const results: Company[] = [];
-  let loaded = 0;
-  for (const base of rows) {
-    const cleanSlug = String(base.slug).replace(/^\/?company\//, '');
-    const candidates = [cleanSlug, sanitizeSnapshotSlug(cleanSlug)];
-    let snap: RawSnapshot | null = null;
-    try {
-      let raw: string | null = null;
-      for (const candidate of [...new Set(candidates)]) {
-        const fp = path.join(companyDir, `${candidate}.json`);
-        try {
-          raw = await fs.readFile(fp, 'utf8');
-          break;
-        } catch {}
-      }
-      if (raw) snap = JSON.parse(raw) as RawSnapshot;
-      else throw new Error('missing snapshot');
-    } catch {
-      snap = { slug: cleanSlug, osha: [], licenses: [], registrations: [] };
-    }
-    results.push(snapshotToCategory({ ...base, slug: cleanSlug }, snap));
-    loaded++;
-    if (loaded % 10000 === 0) process.stdout.write(`\r    已读取: ${loaded}/${rows.length}...   `);
-  }
-  process.stdout.write('\r');
-  return results;
+  return rows;
 }
 
 // ─── 主流程 ──────────────────────────────────────────────────────────────────
 async function processState(stateSlug: string) {
-  console.log(`  [${stateSlug}] 从 company 快照读取数据...`);
-  const allCompanies = await loadCompaniesFromSnapshots(stateSlug);
+  console.log(`  [${stateSlug}] 从数据库聚合读取数据...`);
+  const allCompanies = await loadCompaniesFromDatabase(stateSlug);
   console.log(`  [${stateSlug}] 共 ${allCompanies.length} 家公司`);
 
   // 先覆盖 state 快照为全量（避免旧文件仅 5000 条）

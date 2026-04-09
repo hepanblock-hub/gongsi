@@ -32,9 +32,10 @@ export default async function HomePage() {
   } catch {
     rows = [];
   }
-  const popularStates = ['california'];
+  const popularStates = ['california', 'florida'];
   const stateSeoText: Record<string, string> = {
     california: 'California contractor license and OSHA records lookup',
+    florida: 'Florida contractor license and OSHA records lookup',
   };
 
   return (
