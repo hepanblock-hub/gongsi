@@ -26,9 +26,9 @@ const sourceDir =
   path.join(rootDir, 'downloads', 'california', 'osha', 'extracted');
 
 const batchSize = Math.max(1000, Number(process.env.OSHA_IMPORT_BATCH_SIZE || 5000));
-const stateCode = (process.env.CALIFORNIA_STATE_CODE || 'CA').toUpperCase();
-const sourceName = 'California OSHA (Local CSV)';
-const sourceUrl = 'https://www.osha.gov/data';
+const stateCode = (process.env.OSHA_STATE_CODE || process.env.CALIFORNIA_STATE_CODE || 'CA').toUpperCase();
+const sourceName = process.env.OSHA_SOURCE_NAME || `${stateCode} OSHA (Local CSV)`;
+const sourceUrl = process.env.OSHA_SOURCE_URL || 'https://www.osha.gov/data';
 
 const pool = new Pool({
   connectionString: databaseUrl,

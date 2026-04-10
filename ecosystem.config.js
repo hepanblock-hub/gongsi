@@ -12,7 +12,9 @@ module.exports = {
         NODE_ENV: "development",
         PORT: "39017",
         DATABASE_URL: process.env.DATABASE_URL || "postgresql://gongsi_admin:gongsi_pass_2026@localhost:54333/gongsihegui_db",
-        NEXT_DISABLE_TURBOPACK: "1"
+        NEXT_DISABLE_TURBOPACK: "1",
+        SNAPSHOT_DISABLE: "1",
+        RELEASE_CONTROL_MODE: "off"
       }
     }
   ]

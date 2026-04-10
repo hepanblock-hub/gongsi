@@ -11,6 +11,9 @@
     "pm2:autostart": "powershell -ExecutionPolicy Bypass -File D:\\gongsihegui\\scripts\\setup_pm2_autostart.ps1",
     "ingest:ca:osha": "node D:\\gongsihegui\\scripts\\ingest_california_osha.mjs",
     "ingest:ca:cslb": "node D:\\gongsihegui\\scripts\\ingest_california_cslb.mjs",
+    "download:fl:dbpr": "powershell -ExecutionPolicy Bypass -File D:\\gongsihegui\\scripts\\download_florida_dbpr.ps1",
+    "ingest:fl:dbpr": "node D:\\gongsihegui\\scripts\\ingest_florida_dbpr.mjs",
+    "upload:fl:dbpr:prod": "powershell -ExecutionPolicy Bypass -File D:\\gongsihegui\\scripts\\upload_florida_dbpr_to_prod.ps1",
     "ingest:ca:osha:local": "node D:\\gongsihegui\\scripts\\ingest_california_osha_from_csv.mjs",
     "backfill:ca:osha:names": "node D:\\gongsihegui\\scripts\\backfill_osha_company_names.mjs",
     "backfill:ca:osha:names:weak": "node D:\\gongsihegui\\scripts\\backfill_osha_company_names_weak.mjs",
@@ -30,7 +33,11 @@
     "upload:snapshots": "npx tsx scripts/upload-snapshots.ts",
     "upload:snapshots:all": "cross-env SNAPSHOT_UPLOAD_SUBDIRS=company,state,city,filter,root npx tsx scripts/upload-snapshots.ts",
     "upload:snapshots:force": "cross-env SNAPSHOT_UPLOAD_UPSERT=true SNAPSHOT_UPLOAD_SUBDIRS=company,state,city,filter,root npx tsx scripts/upload-snapshots.ts",
-    "gen:snapshots:city-filter": "npx tsx scripts/gen_city_filter_snapshots.ts"
+    "gen:snapshots:city-filter": "npx tsx scripts/gen_city_filter_snapshots.ts",
+    "download:ca:cosmetology": "powershell -ExecutionPolicy Bypass -File D:\\gongsihegui\\scripts\\download_california_cosmetology.ps1",
+    "ingest:ca:cosmetology": "node D:\\gongsihegui\\scripts\\ingest_california_cosmetology.mjs",
+    "scrape:ca:cosmetology:dca": "node D:\\gongsihegui\\scripts\\scrape_ca_cosmetology_dca.mjs",
+    "scrape:ca:cosmetology:dca:attach": "cross-env DCA_CA_ATTACH_EXISTING=true DCA_CA_CDP_URL=http://127.0.0.1:9222 node D:\\gongsihegui\\scripts\\scrape_ca_cosmetology_dca.mjs"
   },
   "dependencies": {
     "next": "^15.5.14",
@@ -39,11 +46,13 @@
     "react-dom": "19.0.0"
   },
   "devDependencies": {
+    "xlsx": "^0.18.5",
     "@types/node": "22.15.3",
     "@types/pg": "^8.20.0",
     "@types/react": "19.0.12",
     "@types/react-dom": "19.0.5",
     "cross-env": "^10.1.0",
+    "playwright": "^1.54.2",
     "typescript": "5.8.3"
   }
 }
