@@ -710,7 +710,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
           <SectionCard title="Related companies">
             <ul>
               {(related ?? []).map((c) => (
-                <li key={c.slug}><a href={c.slug}>{c.company_name}</a></li>
+                <li key={c.slug}><a href={`/company/${c.slug}`}>{c.company_name}</a></li>
               ))}
             </ul>
             <p>

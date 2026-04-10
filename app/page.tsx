@@ -129,7 +129,7 @@ export default async function HomePage() {
           <tbody>
             {rows.slice(0, 12).map((r) => (
               <tr key={r.slug}>
-                <td><a href={r.slug}>{r.company_name}</a></td>
+                <td><a href={`/company/${r.slug}`}>{r.company_name}</a></td>
                 <td>{r.state}</td>
                 <td>{recordTypeLabel(r.has_osha, r.has_license, r.has_registration)}</td>
                 <td>{r.updated_at ?? '-'}</td>

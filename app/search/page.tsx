@@ -70,7 +70,7 @@ export default async function SearchPage({
             <div className="result-list">
               {pagedRows.map((row) => (
                 <article key={row.slug} className="card result-card">
-                  <h3><a href={row.slug}>{row.company_name}</a></h3>
+                  <h3><a href={`/company/${row.slug}`}>{row.company_name}</a></h3>
                   <p>{row.state}{row.city ? ` · ${row.city}` : ''}</p>
                   <div className="result-badges">
                     <StatusBadge
@@ -88,8 +88,8 @@ export default async function SearchPage({
                   </div>
                   <p className="muted">Last updated: {row.updated_at ?? '-'}</p>
                   <p>
-                    <a href={row.slug}>View profile</a> · <a href={`${row.slug}#osha-records`}>OSHA</a> ·{' '}
-                    <a href={`${row.slug}#license-records`}>License</a> · <a href={`${row.slug}#registration-records`}>Registration</a>
+                    <a href={`/company/${row.slug}`}>View profile</a> · <a href={`/company/${row.slug}#osha-records`}>OSHA</a> ·{' '}
+                    <a href={`/company/${row.slug}#license-records`}>License</a> · <a href={`/company/${row.slug}#registration-records`}>Registration</a>
                   </p>
                 </article>
               ))}

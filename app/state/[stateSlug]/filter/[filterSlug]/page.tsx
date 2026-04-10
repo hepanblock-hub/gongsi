@@ -475,15 +475,15 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
           <tbody>
             {topCompanies.map((c) => (
               <tr key={c.slug}>
-                <td><a href={c.slug}>{c.company_name}</a></td>
+                <td><a href={`/company/${c.slug}`}>{c.company_name}</a></td>
                 <td>{(c.city ?? 'Unknown').toLowerCase().replace(/\b\w/g, (x) => x.toUpperCase())}</td>
                 <td>{c.osha_count || 0}</td>
                 <td>{c.license_status ?? 'Unknown'}</td>
                 <td>{getDecisionSignal(c)}</td>
                 <td>{getDecisionNote(c, stateName)}</td>
                 <td>
-                  <a href={`${c.slug}#osha-records`}>OSHA</a> · <a href={`${c.slug}#license-records`}>License</a> ·{' '}
-                  <a href={`${c.slug}#registration-records`}>Registration</a>
+                  <a href={`/company/${c.slug}#osha-records`}>OSHA</a> · <a href={`/company/${c.slug}#license-records`}>License</a> ·{' '}
+                  <a href={`/company/${c.slug}#registration-records`}>Registration</a>
                 </td>
               </tr>
             ))}
