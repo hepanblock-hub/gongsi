@@ -13,8 +13,7 @@ export const metadata: Metadata = {
   alternates: {
     canonical: '/search',
   },
-  // Search result pages with query params should not be indexed to avoid duplicate content
-  robots: { index: false, follow: true },
+  robots: { index: true, follow: true },
 };
 
 export default async function SearchPage({

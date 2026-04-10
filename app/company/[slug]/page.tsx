@@ -221,7 +221,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!snapshot && !(await isReleasedCompanyLocation(routePage.state, routePage.city))) {
     return {
       title: { absolute: 'Company records | Compliance Lookup' },
-      robots: { index: false, follow: false },
+      robots: { index: true, follow: true },
       alternates: { canonical: `/state/${normalizeStateSlug(routePage.state)}` },
     };
   }
@@ -286,7 +286,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: { absolute: title },
     description,
-    robots: entityLooksReal ? { index: true, follow: true } : { index: false, follow: true },
+    robots: { index: true, follow: true },
     alternates: {
       canonical: page.slug,
     },

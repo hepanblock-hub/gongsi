@@ -106,7 +106,7 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   if (!citySnapshot && !(await isReleasedCity(stateSlug, citySlug))) {
     return {
       title: { absolute: 'City records | Compliance Lookup' },
-      robots: { index: false, follow: false },
+      robots: { index: true, follow: true },
       alternates: { canonical: `/state/${stateSlug}/cities` },
     };
   }
