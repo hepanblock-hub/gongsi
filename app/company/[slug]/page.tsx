@@ -321,14 +321,20 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
       ]);
 
   const [timeline, related] = snapshot
-    ? [snapshot.timeline, snapshot.related]
+    ? await Promise.all([
+        snapshot.timeline ?? getCompanyTimeline(page.company_name, page.state, 12),
+        snapshot.related ?? getRelatedCompanies(page.company_name, page.state, page.city, 6, page.slug),
+      ])
     : await Promise.all([
         getCompanyTimeline(page.company_name, page.state, 12),
         getRelatedCompanies(page.company_name, page.state, page.city, 6, page.slug),
       ]);
 
   const [detailedLocation, cityBenchmark] = snapshot
-    ? [snapshot.location, snapshot.benchmark]
+    ? await Promise.all([
+        snapshot.location ?? getCompanyDetailedLocation(page.company_name, page.state),
+        snapshot.benchmark ?? getCityComplianceBenchmark(page.state, page.city),
+      ])
     : await Promise.all([
         getCompanyDetailedLocation(page.company_name, page.state),
         getCityComplianceBenchmark(page.state, page.city),
