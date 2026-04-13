@@ -6,7 +6,7 @@ import SectionCard from '../../../components/common/SectionCard';
 import BreadcrumbJsonLd from '../../../components/seo/BreadcrumbJsonLd';
 import { canonicalCityPath, canonicalFilterPath } from '../../../lib/indexing';
 import { getStateCityCounts, getStateCompanyPagesWithCategory, getStateSummary, type StateCompanyCategoryRow } from '../../../lib/queries';
-import { SITE_URL, stateSlugToName } from '../../../lib/site';
+import { companyPathFromSlug, SITE_URL, stateSlugToName } from '../../../lib/site';
 import { fetchStateSnapshot } from '../../../lib/stateSnapshot';
 
 export const revalidate = 86400;
@@ -355,12 +355,12 @@ export default async function StatePage({
           <tbody>
             {pagedCompanies.map((c) => (
               <tr key={c.slug}>
-                <td><a href={`/company/${c.slug}`}>{c.company_name}</a></td>
+                <td><a href={companyPathFromSlug(c.slug)}>{c.company_name}</a></td>
                 <td>{normalizeCityName(c.city)}</td>
                 <td>{profileLabel(categoryOfCompany(c))}</td>
                 <td>
-                  <a href={`/company/${c.slug}#osha-records`}>OSHA</a> · <a href={`/company/${c.slug}#license-records`}>License</a> ·{' '}
-                  <a href={`/company/${c.slug}#registration-records`}>Registration</a>
+                  <a href={`${companyPathFromSlug(c.slug)}#osha-records`}>OSHA</a> · <a href={`${companyPathFromSlug(c.slug)}#license-records`}>License</a> ·{' '}
+                  <a href={`${companyPathFromSlug(c.slug)}#registration-records`}>Registration</a>
                 </td>
               </tr>
             ))}
@@ -375,7 +375,7 @@ export default async function StatePage({
             <ul>
               {g.items.sort(compareCompanies).slice(0, 100).map((c) => (
                 <li key={`city-${g.name}-${c.slug}`}>
-                  <a href={`/company/${c.slug}`}>{c.company_name}</a> ·{' '}
+                  <a href={companyPathFromSlug(c.slug)}>{c.company_name}</a> ·{' '}
                   {profileLabel(categoryOfCompany(c))}
                 </li>
               ))}

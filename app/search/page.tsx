@@ -5,7 +5,7 @@ import Pagination from '../../components/common/Pagination';
 import StatusBadge from '../../components/common/StatusBadge';
 import BreadcrumbJsonLd from '../../components/seo/BreadcrumbJsonLd';
 import { searchCompanies } from '../../lib/queries';
-import { SITE_URL } from '../../lib/site';
+import { companyPathFromSlug, SITE_URL } from '../../lib/site';
 
 export const metadata: Metadata = {
   title: { absolute: 'Search Public Company Records | OSHA, License & Registration' },
@@ -70,7 +70,7 @@ export default async function SearchPage({
             <div className="result-list">
               {pagedRows.map((row) => (
                 <article key={row.slug} className="card result-card">
-                  <h3><a href={`/company/${row.slug}`}>{row.company_name}</a></h3>
+                  <h3><a href={companyPathFromSlug(row.slug)}>{row.company_name}</a></h3>
                   <p>{row.state}{row.city ? ` · ${row.city}` : ''}</p>
                   <div className="result-badges">
                     <StatusBadge
@@ -88,8 +88,8 @@ export default async function SearchPage({
                   </div>
                   <p className="muted">Last updated: {row.updated_at ?? '-'}</p>
                   <p>
-                    <a href={`/company/${row.slug}`}>View profile</a> · <a href={`/company/${row.slug}#osha-records`}>OSHA</a> ·{' '}
-                    <a href={`/company/${row.slug}#license-records`}>License</a> · <a href={`/company/${row.slug}#registration-records`}>Registration</a>
+                    <a href={companyPathFromSlug(row.slug)}>View profile</a> · <a href={`${companyPathFromSlug(row.slug)}#osha-records`}>OSHA</a> ·{' '}
+                    <a href={`${companyPathFromSlug(row.slug)}#license-records`}>License</a> · <a href={`${companyPathFromSlug(row.slug)}#registration-records`}>Registration</a>
                   </p>
                 </article>
               ))}

@@ -3,6 +3,7 @@ import PageTitle from '../components/common/PageTitle';
 import SectionCard from '../components/common/SectionCard';
 import { getRecentCompanyPages } from '../lib/queries';
 import { fetchRecentSnapshot } from '../lib/rootSnapshot';
+import { companyPathFromSlug } from '../lib/site';
 
 function recordTypeLabel(hasOsha: boolean, hasLicense: boolean, hasRegistration: boolean): string {
   const count = [hasOsha, hasLicense, hasRegistration].filter(Boolean).length;
@@ -129,7 +130,7 @@ export default async function HomePage() {
           <tbody>
             {rows.slice(0, 12).map((r) => (
               <tr key={r.slug}>
-                <td><a href={`/company/${r.slug}`}>{r.company_name}</a></td>
+                <td><a href={companyPathFromSlug(r.slug)}>{r.company_name}</a></td>
                 <td>{r.state}</td>
                 <td>{recordTypeLabel(r.has_osha, r.has_license, r.has_registration)}</td>
                 <td>{r.updated_at ?? '-'}</td>

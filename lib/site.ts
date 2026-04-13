@@ -13,7 +13,19 @@ export function stateSlugToName(stateSlug: string): string {
 }
 
 export function companyPathFromSlug(fullSlug: string): string {
-  return fullSlug.startsWith('/company/') ? fullSlug : `/company/${fullSlug}`;
+  const trimmed = fullSlug.trim();
+  if (!trimmed) return '/company';
+
+  const withoutOrigin = trimmed.replace(/^https?:\/\/[^/]+/i, '');
+  const [pathOnly] = withoutOrigin.split(/[?#]/, 1);
+  let normalized = pathOnly.replace(/^\/+/, '');
+
+  while (/^company\/+?/i.test(normalized)) {
+    normalized = normalized.replace(/^company\/+?/i, '');
+  }
+
+  normalized = normalized.replace(/^\/+/, '');
+  return normalized ? `/company/${normalized}` : '/company';
 }
 
 export function formatDate(value: string | null): string {

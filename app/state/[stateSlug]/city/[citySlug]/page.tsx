@@ -5,7 +5,7 @@ import PageTitle from '../../../../../components/common/PageTitle';
 import SectionCard from '../../../../../components/common/SectionCard';
 import { isReleasedCity } from '../../../../../lib/release';
 import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
-import { stateSlugToName } from '../../../../../lib/site';
+import { companyPathFromSlug, stateSlugToName } from '../../../../../lib/site';
 import { fetchCitySnapshot } from '../../../../../lib/citySnapshot';
 
 export const revalidate = 86400;
@@ -315,15 +315,15 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
           <tbody>
             {topCompanies.map((c) => (
               <tr key={c.slug}>
-                <td><a href={`/company/${c.slug}`}>{c.company_name}</a></td>
+                <td><a href={companyPathFromSlug(c.slug)}>{c.company_name}</a></td>
                 <td>{categoryOfCompany(c)}</td>
                 <td>{c.osha_count || 0}</td>
                 <td>{c.license_status ?? 'Unknown'}</td>
                 <td>{getDecisionSignal(c)}</td>
                 <td>{getDecisionNote(c, stateName)}</td>
                 <td>
-                  <a href={`/company/${c.slug}#osha-records`}>OSHA</a> · <a href={`/company/${c.slug}#license-records`}>License</a> ·{' '}
-                  <a href={`/company/${c.slug}#registration-records`}>Registration</a>
+                  <a href={`${companyPathFromSlug(c.slug)}#osha-records`}>OSHA</a> · <a href={`${companyPathFromSlug(c.slug)}#license-records`}>License</a> ·{' '}
+                  <a href={`${companyPathFromSlug(c.slug)}#registration-records`}>Registration</a>
                 </td>
               </tr>
             ))}
