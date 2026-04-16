@@ -27,6 +27,34 @@ function getBaseUrl(): string | null {
   return process.env.CITY_SNAPSHOT_BASE_URL?.replace(/\/$/, '') ?? null;
 }
 
+function snapshotsDisabled(): boolean {
+  const v = (process.env.SNAPSHOT_DISABLE ?? '').toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
+function getSnapshotToken(): string | null {
+  return (
+    process.env.SNAPSHOT_STORAGE_TOKEN ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_ANON_KEY ??
+    null
+  );
+}
+
+function buildSnapshotCandidates(url: string, token: string | null): string[] {
+  if (!token) return [url];
+  if (!url.includes('/storage/v1/object/public/')) return [url];
+  return [url, url.replace('/storage/v1/object/public/', '/storage/v1/object/authenticated/')];
+}
+
+function buildSnapshotHeaders(token: string | null): HeadersInit | undefined {
+  if (!token) return undefined;
+  return {
+    Authorization: `Bearer ${token}`,
+    apikey: token,
+  };
+}
+
 const SNAPSHOT_DEBUG = process.env.SNAPSHOT_DEBUG === 'true';
 
 /**
@@ -36,22 +64,29 @@ export async function fetchCitySnapshot(
   stateSlug: string,
   citySlug: string
 ): Promise<CitySnapshot | null> {
+  if (snapshotsDisabled()) return null;
   const base = getBaseUrl();
   if (!base) return null;
+  const token = getSnapshotToken();
+  const headers = buildSnapshotHeaders(token);
 
   const url = `${base}/${encodeURIComponent(stateSlug)}/${encodeURIComponent(citySlug)}.json`;
-  try {
-    const res = await fetch(url, {
-      next: { revalidate: 86400 },
-    });
-    if (!res.ok) {
-      if (SNAPSHOT_DEBUG) console.info(`[snapshot-miss] city/${stateSlug}/${citySlug}.json status=${res.status}`);
-      return null;
+  for (const requestUrl of buildSnapshotCandidates(url, token)) {
+    try {
+      const res = await fetch(requestUrl, {
+        headers,
+        next: { revalidate: 86400 },
+      });
+      if (!res.ok) {
+        if (SNAPSHOT_DEBUG) console.info(`[snapshot-miss] city/${stateSlug}/${citySlug}.json status=${res.status}`);
+        continue;
+      }
+      if (SNAPSHOT_DEBUG) console.info(`[snapshot-hit] city/${stateSlug}/${citySlug}.json`);
+      return (await res.json()) as CitySnapshot;
+    } catch {
+      if (SNAPSHOT_DEBUG) console.info(`[snapshot-miss] city/${stateSlug}/${citySlug}.json error`);
+      continue;
     }
-    if (SNAPSHOT_DEBUG) console.info(`[snapshot-hit] city/${stateSlug}/${citySlug}.json`);
-    return (await res.json()) as CitySnapshot;
-  } catch {
-    if (SNAPSHOT_DEBUG) console.info(`[snapshot-miss] city/${stateSlug}/${citySlug}.json error`);
-    return null;
   }
+  return null;
 }

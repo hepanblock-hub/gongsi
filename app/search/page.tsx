@@ -4,6 +4,7 @@ import EmptyState from '../../components/common/EmptyState';
 import Pagination from '../../components/common/Pagination';
 import StatusBadge from '../../components/common/StatusBadge';
 import BreadcrumbJsonLd from '../../components/seo/BreadcrumbJsonLd';
+import { fetchRecentSnapshot } from '../../lib/rootSnapshot';
 import { searchCompanies } from '../../lib/queries';
 import { companyPathFromSlug, SITE_URL } from '../../lib/site';
 
@@ -30,14 +31,44 @@ export default async function SearchPage({
   const page = Math.max(1, Number(params.page ?? '1') || 1);
   const pageSize = 10;
 
+  const recentSnapshot = await fetchRecentSnapshot();
+
   const rows = q || state || city
-    ? await searchCompanies({
-      query: q,
-      state: state || undefined,
-      city: city || undefined,
-      hasOsha,
-      sort,
-    })
+    ? recentSnapshot
+      ? recentSnapshot.data
+        .filter((row) => {
+          const matchQ = q
+            ? row.company_name.toLowerCase().includes(q.toLowerCase()) || row.slug.toLowerCase().includes(q.toLowerCase())
+            : true;
+          const matchState = state ? row.state.toLowerCase() === state.toLowerCase() : true;
+          const matchCity = city ? (row.city ?? '').toLowerCase() === city.toLowerCase() : true;
+          const matchOsha = hasOsha ? row.has_osha : true;
+          return matchQ && matchState && matchCity && matchOsha;
+        })
+        .sort((a, b) => {
+          if (sort === 'updated') {
+            const aTime = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+            const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+            return bTime - aTime;
+          }
+          if (sort === 'osha') {
+            return Number(b.has_osha) - Number(a.has_osha) || a.company_name.localeCompare(b.company_name);
+          }
+          return a.company_name.localeCompare(b.company_name);
+        })
+        .map((row) => ({
+          ...row,
+          osha_count: row.has_osha ? 1 : 0,
+          license_status: 'unknown',
+          registration_status: 'unknown',
+        }))
+      : await searchCompanies({
+          query: q,
+          state: state || undefined,
+          city: city || undefined,
+          hasOsha,
+          sort,
+        })
     : [];
 
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);

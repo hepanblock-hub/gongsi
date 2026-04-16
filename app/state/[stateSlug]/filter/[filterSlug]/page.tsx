@@ -24,6 +24,79 @@ function isFilterSlug(value: string): value is FilterSlug {
   return FILTERS.includes(value as FilterSlug);
 }
 
+const STATE_NAME_TO_CODE: Record<string, string> = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO', connecticut: 'CT',
+  delaware: 'DE', florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA',
+  kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA', michigan: 'MI',
+  minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH',
+  'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH',
+  oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD',
+  tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV',
+  wisconsin: 'WI', wyoming: 'WY',
+};
+
+function stateCodeOf(stateName: string): string {
+  return STATE_NAME_TO_CODE[stateName.toLowerCase()] ?? stateName;
+}
+
+function shouldIndexFilter(filterSlug: string): boolean {
+  return ['quality', 'osha-violations', 'contractor-licenses'].includes(filterSlug);
+}
+
+function inferIndustryTag(companyName: string): string {
+  const n = companyName.toLowerCase();
+  if (/(roof|roofing)/.test(n)) return 'Roofing';
+  if (/(electrical|electric)/.test(n)) return 'Electrical';
+  if (/(plumb|plumbing)/.test(n)) return 'Plumbing';
+  if (/(hvac|heating|air\s?conditioning|cooling)/.test(n)) return 'HVAC';
+  if (/(concrete|cement|masonry)/.test(n)) return 'Concrete/Masonry';
+  if (/(landscape|landscaping|tree\s?service)/.test(n)) return 'Landscaping';
+  if (/(paint|painting)/.test(n)) return 'Painting';
+  if (/(construction|builders|contractor)/.test(n)) return 'General Construction';
+  return 'Other';
+}
+
+function officialLinksForState(stateSlug: string): {
+  licenseAgency: string;
+  licenseLookup: string;
+  registrationAgency: string;
+  registrationLookup: string;
+} {
+  if (stateSlug === 'texas') {
+    return {
+      licenseAgency: 'Texas Department of Licensing and Regulation (TDLR)',
+      licenseLookup: 'https://www.tdlr.texas.gov/LicenseSearch/',
+      registrationAgency: 'Texas Secretary of State',
+      registrationLookup: 'https://direct.sos.state.tx.us/acct/acct-login.asp',
+    };
+  }
+  if (stateSlug === 'california') {
+    return {
+      licenseAgency: 'California CSLB',
+      licenseLookup: 'https://www.cslb.ca.gov/OnlineServices/CheckLicenseII/CheckLicense.aspx',
+      registrationAgency: 'California Secretary of State',
+      registrationLookup: 'https://bizfileonline.sos.ca.gov/search/business',
+    };
+  }
+  if (stateSlug === 'florida') {
+    return {
+      licenseAgency: 'Florida DBPR',
+      licenseLookup: 'https://www.myfloridalicense.com/wl11.asp?mode=0&SID=',
+      registrationAgency: 'Florida Division of Corporations',
+      registrationLookup: 'https://search.sunbiz.org/Inquiry/CorporationSearch/ByName',
+    };
+  }
+
+  const stateName = stateSlugToName(stateSlug);
+  const encodedState = encodeURIComponent(stateName);
+  return {
+    licenseAgency: `${stateName} state licensing agency`,
+    licenseLookup: `https://www.google.com/search?q=${encodedState}+contractor+license+lookup+official`,
+    registrationAgency: `${stateName} Secretary of State`,
+    registrationLookup: `https://www.google.com/search?q=${encodedState}+secretary+of+state+business+search`,
+  };
+}
+
 function isEncodedCompanyName(name: string): boolean {
   const compact = name.replace(/\s+/g, '');
   return /^[0-9]/.test(name) || /^[A-Z0-9-]{10,}$/.test(compact) || /\d{3,}/.test(compact);
@@ -216,13 +289,19 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   const { stateSlug, filterSlug } = await params;
   const normalizedFilterSlug = canonicalFilterSlug(filterSlug);
   const stateName = stateSlugToName(stateSlug);
-  const title = isPrimaryFilterSlug(normalizedFilterSlug) ? filterTitle(normalizedFilterSlug, stateName) : `${stateName} company records`;
+  const stateCode = stateCodeOf(stateName);
+  const title = isPrimaryFilterSlug(normalizedFilterSlug)
+    ? (normalizedFilterSlug === 'osha-violations'
+      ? `Top OSHA Violations Companies in ${stateName}, ${stateCode}`
+      : filterTitle(normalizedFilterSlug, stateName))
+    : `${stateName} company records`;
   const description = isPrimaryFilterSlug(normalizedFilterSlug) ? filterDescription(normalizedFilterSlug, stateName) : `Browse public company compliance records in ${stateName}.`;
 
   return {
     title: { absolute: title },
     description,
     alternates: { canonical: canonicalFilterPath(stateSlug, normalizedFilterSlug) },
+    robots: { index: shouldIndexFilter(normalizedFilterSlug), follow: true },
     authors: [{ name: 'Compliance Lookup Editorial Team' }],
     creator: 'Compliance Lookup Data Team',
     publisher: 'Compliance Lookup',
@@ -238,6 +317,8 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
   }
 
   const stateName = stateSlugToName(stateSlug);
+  const stateCode = stateCodeOf(stateName);
+  const officialLinks = officialLinksForState(stateSlug);
   
   // 优先尝试从快照读取筛选数据
   const { fetchFilterSnapshot } = await import('../../../../../lib/filterSnapshot');
@@ -315,6 +396,26 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
   const withLicenseCount = topCompanies.filter((c) => c.has_license).length;
   const withRegistrationCount = topCompanies.filter((c) => c.has_registration).length;
 
+  const topHighRiskReview = [...companies]
+    .filter((c) => getDecisionSignal(c) === 'Higher review risk')
+    .sort((a, b) => (b.injury_count || 0) - (a.injury_count || 0) || (b.osha_count || 0) - (a.osha_count || 0))
+    .slice(0, 10);
+  const topActiveLicensed = [...companies]
+    .filter((c) => (c.license_status ?? '').toLowerCase() === 'active')
+    .sort(compareCompanies)
+    .slice(0, 10);
+
+  const cityCounts = new Map<string, number>();
+  const industryCounts = new Map<string, number>();
+  for (const c of topCompanies) {
+    const city = (c.city ?? 'Unknown').toLowerCase().replace(/\b\w/g, (x) => x.toUpperCase());
+    cityCounts.set(city, (cityCounts.get(city) ?? 0) + 1);
+    const ind = inferIndustryTag(c.company_name);
+    industryCounts.set(ind, (industryCounts.get(ind) ?? 0) + 1);
+  }
+  const topCities = Array.from(cityCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topIndustries = Array.from(industryCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
   const intentCopy = filterIntentCopy(normalizedFilterSlug, stateName);
 
   return (
@@ -328,7 +429,9 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
       />
 
       <PageTitle
-        title={filterTitle(normalizedFilterSlug, stateName)}
+        title={normalizedFilterSlug === 'osha-violations'
+          ? `Top OSHA Violations Companies in ${stateName}, ${stateCode}`
+          : filterTitle(normalizedFilterSlug, stateName)}
         description={(() => {
           const descriptions: Record<string, string> = {
             'quality': 'Companies ranked by compliance data completeness and recency',
@@ -356,6 +459,17 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
         })()}
       />
 
+      <SectionCard title={`What this ${stateName} filter page is for (tool mode)`}>
+        <p>
+          This is a screening tool page, not a final legal registry. Use it to prioritize which companies to review first,
+          then confirm final standing using official state portals.
+        </p>
+        <p>
+          Search-intent terms supported here include: “company OSHA violations {stateName}”, “OSHA inspection record {stateName}”,
+          and “contractor license status {stateName}”.
+        </p>
+      </SectionCard>
+
       <SectionCard title="Direct search first, filter second">
         <p>
           Best workflow: if you know a company name, search directly first; if not, use this filtered list for shortlist and triage.
@@ -379,6 +493,40 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
             <li key={item}>{item}</li>
           ))}
         </ul>
+      </SectionCard>
+
+      <SectionCard title={`Top companies to review first in ${stateName}`}>
+        <p>
+          This block converts raw records into decision order: review high-risk entities first, then compare active-license entities.
+        </p>
+
+        <h3>High OSHA / injury review queue (top 10)</h3>
+        {topHighRiskReview.length > 0 ? (
+          <ol>
+            {topHighRiskReview.map((c) => (
+              <li key={`risk-${c.slug}`}>
+                <a href={companyPathFromSlug(c.slug)}>{c.company_name}</a>
+                {' '}· OSHA {c.osha_count || 0} · Injury {c.injury_count || 0}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>No high-risk entities in current filtered result.</p>
+        )}
+
+        <h3>Active-license shortlist (top 10)</h3>
+        {topActiveLicensed.length > 0 ? (
+          <ol>
+            {topActiveLicensed.map((c) => (
+              <li key={`licensed-${c.slug}`}>
+                <a href={companyPathFromSlug(c.slug)}>{c.company_name}</a>
+                {' '}· {((c.city ?? 'Unknown').toLowerCase().replace(/\b\w/g, (x) => x.toUpperCase()))}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>No active-license signals in current filtered result.</p>
+        )}
       </SectionCard>
 
       <SectionCard title="Decision support summary (top 200)">
@@ -409,6 +557,31 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
           Interpretation note: this page is a structured public-record snapshot. Missing records in one source should be read as
           "not observed in current dataset" rather than definitive legal absence. For contract decisions, cross-check final standing with
           official state portals and source links shown on each company page.
+        </p>
+      </SectionCard>
+
+      <SectionCard title={`${stateName} unique pattern snapshot`}>
+        <p>
+          Top cities in current filtered set:
+          {' '}
+          {topCities.length
+            ? topCities.map(([city, count], idx) => (
+              <span key={`city-${city}`}>
+                {city} ({count}){idx < topCities.length - 1 ? ' · ' : ''}
+              </span>
+            ))
+            : 'No city concentration detected.'}
+        </p>
+        <p>
+          Top industries by company-name signals:
+          {' '}
+          {topIndustries.length
+            ? topIndustries.map(([industry, count], idx) => (
+              <span key={`ind-${industry}`}>
+                {industry} ({count}){idx < topIndustries.length - 1 ? ' · ' : ''}
+              </span>
+            ))
+            : 'No industry concentration detected.'}
         </p>
       </SectionCard>
 
@@ -455,11 +628,19 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
         <p>
           We recommend a two-step check for YMYL decisions: (1) shortlist using this view, (2) confirm final standing directly with official state agencies.
         </p>
+        <p>
+          Official sources: 
+          <a href="https://www.osha.gov/establishment-search" rel="nofollow noopener" target="_blank"> OSHA Establishment Search</a>
+          {' '}·{' '}
+          <a href={officialLinks.licenseLookup} rel="nofollow noopener" target="_blank">{officialLinks.licenseAgency}</a>
+          {' '}·{' '}
+          <a href={officialLinks.registrationLookup} rel="nofollow noopener" target="_blank">{officialLinks.registrationAgency}</a>
+        </p>
       </SectionCard>
 
       <div id="company-list" />
       <SectionCard title="Company list">
-        <p>Showing top {topCompanies.length} companies</p>
+        <p>Showing top {topCompanies.length} companies (from {companies.length} matched records)</p>
         <table>
           <thead>
             <tr>
@@ -489,6 +670,17 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
             ))}
           </tbody>
         </table>
+      </SectionCard>
+
+      <SectionCard title={`Next actions in ${stateName}`}>
+        <p>
+          Check another company in {stateName}:
+          {' '}<a href={`/search?state=${encodeURIComponent(stateName)}&q=osha`}>OSHA violations lookup</a>
+          {' '}·{' '}
+          <a href={`/search?state=${encodeURIComponent(stateName)}&q=license`}>license status lookup</a>
+          {' '}·{' '}
+          <a href={`/state/${stateSlug}/cities`}>{stateName} city-level company pages</a>
+        </p>
       </SectionCard>
     </main>
   );

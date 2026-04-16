@@ -7,6 +7,7 @@ export type BottomLineAssessment = {
   plainAnswer: string;
   action: string;
   riskBand: string;
+  screeningPriority: string;
 };
 
 export function buildBottomLineAssessment(input: {
@@ -23,52 +24,57 @@ export function buildBottomLineAssessment(input: {
   const registration = input.registrationStatus.toLowerCase();
 
   const riskBand = input.score >= 80
-    ? 'Top 20% safer-profile band (within this scoring model)'
+    ? 'Higher-confidence documentation band (within this screening model)'
     : input.score >= 60
-      ? 'Middle 40% mixed-profile band (within this scoring model)'
-      : 'Bottom 40% higher-risk band (within this scoring model)';
+      ? 'Mixed-evidence band (within this screening model)'
+      : 'Higher verification-priority band (within this screening model)';
 
   if (!input.entityLooksReal) {
     return {
-      verdict: 'Identity confidence is low in the current dataset',
-      plainAnswer: 'Legitimacy cannot be confirmed from current records alone.',
+      verdict: 'Entity identity requires manual confirmation',
+      plainAnswer: 'Identity details were not fully confirmed in the current dataset. Verify legal entity fields through official state systems.',
       action: 'Verify legal entity name and registration number directly in official state systems before further review.',
       riskBand,
+      screeningPriority: 'High verification priority',
     };
   }
 
   if (input.fatalityEvents > 0 || input.riskLevel === 'High Risk') {
     return {
-      verdict: 'Elevated compliance risk signal detected',
-      plainAnswer: 'This profile shows meaningful risk indicators and should be treated as high-friction during screening.',
+      verdict: 'Elevated verification priority based on available signals',
+      plainAnswer: 'Current records show stronger risk indicators. Additional verification is recommended before shortlisting decisions.',
       action: 'Require full manual verification and supporting documentation before shortlisting.',
       riskBand,
+      screeningPriority: 'High verification priority',
     };
   }
 
   if (!input.hasLicense && !input.hasRegistration) {
     return {
-      verdict: 'Insufficient legal standing evidence in current records',
-      plainAnswer: 'Public safety/compliance data exists, but legal status evidence is incomplete.',
+      verdict: 'Limited legal-status evidence in current dataset',
+      plainAnswer: 'No confirmed license or registration record was observed in the current dataset. Verify directly with official state systems.',
       action: 'Confirm license and entity standing on official portals before considering procurement or hiring decisions.',
       riskBand,
+      screeningPriority: 'Moderate-to-high verification priority',
     };
   }
 
   if (input.riskLevel === 'Low Risk' && license === 'active' && input.hasRegistration && registration !== 'unknown') {
     return {
-      verdict: 'No major compliance red flags observed in current records',
-      plainAnswer: 'Available records indicate a comparatively lower screening risk at this time.',
+      verdict: 'No major verification blockers observed in current records',
+      plainAnswer: 'Available records indicate comparatively stronger documentation coverage in the current dataset.',
       action: 'Proceed to standard due diligence and keep documentary verification in the file.',
       riskBand,
+      screeningPriority: 'Lower verification priority',
     };
   }
 
   return {
     verdict: 'Mixed signals: further verification recommended',
-    plainAnswer: 'This profile does not show a clear pass/fail outcome from public data alone.',
+    plainAnswer: 'This profile does not show a clear pass/fail outcome from current public data alone and should be verified source-by-source.',
     action: 'Run targeted verification for missing or unclear fields before a final decision.',
     riskBand,
+    screeningPriority: 'Moderate verification priority',
   };
 }
 
@@ -85,9 +91,9 @@ export default function DecisionSupportLayers({
     <>
       <SectionCard title="Bottom-line screening conclusion">
         <p><strong>Verdict:</strong> {bottomLine.verdict}</p>
-        <p><strong>Direct answer for "is this company legit?":</strong> {bottomLine.plainAnswer}</p>
+        <p><strong>Direct verification takeaway:</strong> {bottomLine.plainAnswer}</p>
         <p><strong>Recommended action:</strong> {bottomLine.action}</p>
-        <p><strong>Relative risk position:</strong> {bottomLine.riskBand}.</p>
+        <p><strong>Relative position:</strong> {bottomLine.riskBand}.</p>
       </SectionCard>
 
       <SectionCard title="Who should care and when this matters">

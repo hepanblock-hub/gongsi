@@ -4,6 +4,7 @@ import Breadcrumbs from '../../../components/common/Breadcrumbs';
 import PageTitle from '../../../components/common/PageTitle';
 import SectionCard from '../../../components/common/SectionCard';
 import BreadcrumbJsonLd from '../../../components/seo/BreadcrumbJsonLd';
+import JsonLd from '../../../components/seo/JsonLd';
 import { canonicalCityPath, canonicalFilterPath } from '../../../lib/indexing';
 import { getStateCityCounts, getStateCompanyPagesWithCategory, getStateSummary, type StateCompanyCategoryRow } from '../../../lib/queries';
 import { companyPathFromSlug, SITE_URL, stateSlugToName } from '../../../lib/site';
@@ -16,6 +17,75 @@ export const dynamicParams = true;
 export async function generateStaticParams() {
   // 参考 wangzhan：构建期不预渲染，全部按需 ISR
   return [];
+}
+
+const STATE_NAME_TO_CODE: Record<string, string> = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO', connecticut: 'CT',
+  delaware: 'DE', florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA',
+  kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA', michigan: 'MI',
+  minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH',
+  'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH',
+  oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD',
+  tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV',
+  wisconsin: 'WI', wyoming: 'WY',
+};
+
+function stateCodeOf(stateName: string): string {
+  return STATE_NAME_TO_CODE[stateName.toLowerCase()] ?? stateName;
+}
+
+function inferIndustryTag(companyName: string): string {
+  const n = companyName.toLowerCase();
+  if (/(roof|roofing)/.test(n)) return 'Roofing';
+  if (/(electrical|electric)/.test(n)) return 'Electrical';
+  if (/(plumb|plumbing)/.test(n)) return 'Plumbing';
+  if (/(hvac|heating|air\s?conditioning|cooling)/.test(n)) return 'HVAC';
+  if (/(concrete|cement|masonry)/.test(n)) return 'Concrete/Masonry';
+  if (/(landscape|landscaping|tree\s?service)/.test(n)) return 'Landscaping';
+  if (/(paint|painting)/.test(n)) return 'Painting';
+  if (/(construction|builders|contractor)/.test(n)) return 'General Construction';
+  return 'Other';
+}
+
+function officialLinksForState(stateSlug: string): {
+  licenseAgency: string;
+  licenseLookup: string;
+  registrationAgency: string;
+  registrationLookup: string;
+} {
+  if (stateSlug === 'texas') {
+    return {
+      licenseAgency: 'Texas Department of Licensing and Regulation (TDLR)',
+      licenseLookup: 'https://www.tdlr.texas.gov/LicenseSearch/',
+      registrationAgency: 'Texas Secretary of State',
+      registrationLookup: 'https://direct.sos.state.tx.us/acct/acct-login.asp',
+    };
+  }
+  if (stateSlug === 'california') {
+    return {
+      licenseAgency: 'California CSLB',
+      licenseLookup: 'https://www.cslb.ca.gov/OnlineServices/CheckLicenseII/CheckLicense.aspx',
+      registrationAgency: 'California Secretary of State',
+      registrationLookup: 'https://bizfileonline.sos.ca.gov/search/business',
+    };
+  }
+  if (stateSlug === 'florida') {
+    return {
+      licenseAgency: 'Florida DBPR',
+      licenseLookup: 'https://www.myfloridalicense.com/wl11.asp?mode=0&SID=',
+      registrationAgency: 'Florida Division of Corporations',
+      registrationLookup: 'https://search.sunbiz.org/Inquiry/CorporationSearch/ByName',
+    };
+  }
+
+  const stateName = stateSlugToName(stateSlug);
+  const encodedState = encodeURIComponent(stateName);
+  return {
+    licenseAgency: `${stateName} state licensing agency`,
+    licenseLookup: `https://www.google.com/search?q=${encodedState}+contractor+license+lookup+official`,
+    registrationAgency: `${stateName} Secretary of State`,
+    registrationLookup: `https://www.google.com/search?q=${encodedState}+secretary+of+state+business+search`,
+  };
 }
 
 function citySlug(value: string): string {
@@ -83,10 +153,11 @@ function categoryOfCompany(c: StateCompanyCategoryRow): string {
 export async function generateMetadata({ params }: { params: Promise<{ stateSlug: string }> }): Promise<Metadata> {
   const { stateSlug } = await params;
   const stateName = stateSlugToName(stateSlug);
+  const stateCode = stateCodeOf(stateName);
 
   return {
-    title: { absolute: `${stateName} Contractor License & OSHA Violation Records` },
-    description: `Browse public company compliance records in ${stateName}. Search OSHA inspection history, contractor licenses, and registration status from official sources.`,
+    title: { absolute: `Contractor License Lookup in ${stateName}, ${stateCode} + OSHA Violations Records (2026)` },
+    description: `State-level contractor lookup and OSHA violations analysis for ${stateName}. Compare risk tiers, city concentration, and company profiles before hiring decisions.`,
     alternates: {
       canonical: `/state/${stateSlug}`,
     },
@@ -102,9 +173,9 @@ export default async function StatePage({
   params: Promise<{ stateSlug: string }>;
 }) {
   const { stateSlug } = await params;
+  const officialLinks = officialLinksForState(stateSlug);
 
   const snapshot = await fetchStateSnapshot(stateSlug);
-
   const summary = snapshot
     ? {
       state: stateSlugToName(stateSlug),
@@ -162,6 +233,52 @@ export default async function StatePage({
     ?? ((companiesBySearch.filter((c) => c.has_registration).length / analyzedBase) * 100).toFixed(1);
   const fullProfilePct = ((categoryCount.full / Math.max(1, analyzedBase)) * 100).toFixed(1);
   const partialProfilePct = ((categoryCount.partial / Math.max(1, analyzedBase)) * 100).toFixed(1);
+  const stateCode = stateCodeOf(summary.state);
+
+  const industryCounts = new Map<string, number>();
+  for (const c of companiesBySearch) {
+    const tag = inferIndustryTag(c.company_name);
+    industryCounts.set(tag, (industryCounts.get(tag) ?? 0) + 1);
+  }
+  const topIndustries = Array.from(industryCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  const topHighRiskReview = [...companiesBySearch]
+    .filter((c) => (c.injury_count ?? 0) > 0 || (c.license_status ?? '').toLowerCase() === 'suspended' || (c.license_status ?? '').toLowerCase() === 'revoked')
+    .sort((a, b) => (b.injury_count || 0) - (a.injury_count || 0) || (b.osha_count || 0) - (a.osha_count || 0) || compareCompanies(a, b))
+    .slice(0, 10);
+
+  const topVerifiedProfiles = [...companiesBySearch]
+    .filter((c) => (c.license_status ?? '').toLowerCase() === 'active' && c.has_registration)
+    .sort(compareCompanies)
+    .slice(0, 10);
+
+  const top3CitySharePct = ((cityCounts.slice(0, 3).reduce((acc, row) => acc + row.company_count, 0) / Math.max(1, summary.company_count)) * 100).toFixed(1);
+  const stateUrl = `${SITE_URL}/state/${stateSlug}`;
+  const organizationJsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${stateUrl}#organization`,
+    name: 'Compliance Lookup',
+    url: SITE_URL,
+    areaServed: summary.state,
+  };
+  const datasetJsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    '@id': `${stateUrl}#dataset`,
+    name: `${summary.state} Company Compliance Dataset`,
+    description: `State-level public dataset for ${summary.state} including OSHA records, contractor license records, and business registration records.`,
+    url: stateUrl,
+    isAccessibleForFree: true,
+    inLanguage: 'en-US',
+    creator: { '@type': 'Organization', '@id': `${stateUrl}#organization` },
+    publisher: { '@type': 'Organization', '@id': `${stateUrl}#organization` },
+    keywords: [summary.state, 'OSHA', 'contractor license', 'business registration', 'company compliance'],
+    variableMeasured: ['OSHA records', 'license status', 'registration status'],
+    spatialCoverage: summary.state,
+  };
 
   if (!companies.length) {
     notFound();
@@ -178,89 +295,99 @@ export default async function StatePage({
           { name: summary.state, item: `${SITE_URL}/state/${stateSlug}` },
         ]}
       />
+      <JsonLd data={organizationJsonLd} />
+      <JsonLd data={datasetJsonLd} />
 
       <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: summary.state }]} />
       <PageTitle
-        title={`${summary.state} Contractor License Lookup, OSHA Violations & Company Records`}
-        description={`${summary.state} state compliance page for company license lookup, OSHA inspection history, and registration verification.`}
+        title={`Contractor License Lookup in ${summary.state}, ${stateCode} + OSHA Violations Records`}
+        description={`Decision-first state page: prioritize company review order, compare risk tiers, and verify license standing with official ${summary.state} sources.`}
       />
 
-      <SectionCard title={`${summary.state} compliance records overview`}>
+      <SectionCard title={`${summary.state} decision overview (screening first)`}>
         <p>
-          This database aggregates publicly available records from OSHA, state contractor licensing boards, and official business registration systems.
-          It is designed to help users perform preliminary compliance checks before hiring or working with a company.
+          Primary intent of this page: contractor license lookup + OSHA risk triage for {summary.state}. Start with the review queue,
+          then verify legal standing using official state systems.
         </p>
         <p>
-          This page helps users search contractor licenses, review OSHA inspection history, and verify business registration records in {summary.state}.
+          Coverage in current indexed cycle: <strong>{summary.company_count}</strong> companies, <strong>{summary.osha_count}</strong> OSHA records,
+          <strong> {summary.license_count}</strong> license records, <strong>{summary.registration_count}</strong> registration records observed.
         </p>
-        <p>
-          Users can look up whether a company has active licenses, workplace safety violations, or valid registration status
-          using official government data sources.
-        </p>
-      </SectionCard>
-
-      <SectionCard title="What you can check">
-        <ul>
-          <li>Check contractor license status in {summary.state}</li>
-          <li>Search OSHA inspection records and workplace safety history</li>
-          <li>Verify company registration status</li>
-          <li>Review public compliance data from official sources</li>
-        </ul>
       </SectionCard>
 
       <section className="cards">
         <SectionCard title="Total companies indexed">
           <p className="metric">{summary.company_count}</p>
         </SectionCard>
-        <SectionCard title="OSHA inspection records">
+        <SectionCard title="OSHA records observed">
           <p className="metric">{summary.osha_count}</p>
         </SectionCard>
-        <SectionCard title="Contractor license records">
+        <SectionCard title="License records observed">
           <p className="metric">{summary.license_count}</p>
         </SectionCard>
-        <SectionCard title="Business registration records">
+        <SectionCard title="Registration records observed">
           <p className="metric">{summary.registration_count}</p>
         </SectionCard>
       </section>
 
-      <SectionCard title={`${summary.state} compliance data overview`}>
+      <SectionCard title={`${summary.state} data confidence and gap note`}>
         <p>Total companies indexed: {summary.company_count}</p>
         <p>OSHA inspection records: {summary.osha_count}</p>
-        <p>Contractor license records: {summary.license_count > 0 ? 'Available' : 'Not available in current dataset'}</p>
-        <p>Business registration records: {summary.registration_count > 0 ? 'Available' : 'Not currently available in this dataset and may vary by source availability'}</p>
+        <p>Contractor license records: {summary.license_count > 0 ? 'Observed in current cycle' : 'Not observed in current cycle (verify through official board)'}</p>
+        <p>Business registration records: {summary.registration_count > 0 ? 'Observed in current cycle' : 'Not observed in current cycle (check Secretary of State directly)'}</p>
         <p>
-          The large number of OSHA inspection records in {summary.state} reflects extensive workplace safety reporting across industries.
-          Users can use this data to identify companies with inspection history, verify licensing status, and better understand compliance patterns within the state.
+          Interpretation: missing records here should be read as “not observed in this ingestion cycle,” not definitive legal absence.
+          Final eligibility decisions require official agency verification.
         </p>
       </SectionCard>
 
-      <SectionCard title={`How to check a contractor license in ${summary.state}`}>
-        <ol>
-          <li>Enter the company name in the search box on this page</li>
-          <li>Select {summary.state} as the state</li>
-          <li>Review license status, OSHA records, and registration details</li>
-          <li>Verify the company&apos;s compliance status with official {summary.state} state authorities if needed</li>
-        </ol>
-      </SectionCard>
-
-      <SectionCard title="Why checking company compliance matters">
+      <SectionCard title={`${summary.state} unique insight snapshot`}>
         <p>
-          Verifying a company&apos;s license status and safety history helps reduce risk when hiring contractors,
-          especially for construction, repairs, and other regulated industries.
+          City concentration signal: top 3 cities contribute <strong>{top3CitySharePct}%</strong> of indexed companies.
+          This helps estimate whether risk is concentrated in a few metros or spread statewide.
         </p>
         <p>
-          Checking OSHA inspection records and contractor licenses provides preliminary compliance information
-          that can inform hiring and business decisions.
+          Industry pattern (name-based signals): {topIndustries.length
+            ? topIndustries.map(([industry, count], idx) => (
+              <span key={industry}>{industry} ({count}){idx < topIndustries.length - 1 ? ' · ' : ''}</span>
+            ))
+            : 'No dominant industry pattern detected in current sample.'}
         </p>
       </SectionCard>
 
-      <SectionCard title="Who uses this page">
-        <ul>
-          <li>Homeowners hiring contractors for renovations or repairs</li>
-          <li>Businesses verifying vendors and subcontractors</li>
-          <li>Job seekers reviewing employer safety records</li>
-          <li>General users researching company compliance history</li>
-        </ul>
+      <SectionCard title={`Top companies to review first in ${summary.state}`}>
+        <p>
+          Ranking logic: (1) injury-linked and suspended/revoked signals first, (2) then active-license + registration profiles.
+          This is designed for decision workflow, not raw alphabetical browsing.
+        </p>
+
+        <h3>High-risk review queue (top 10)</h3>
+        {topHighRiskReview.length > 0 ? (
+          <ol>
+            {topHighRiskReview.map((c) => (
+              <li key={`risk-${c.slug}`}>
+                <a href={companyPathFromSlug(c.slug)}>{c.company_name}</a>
+                {' '}· OSHA {c.osha_count || 0} · Injury {c.injury_count || 0}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>No high-risk entities in current state sample.</p>
+        )}
+
+        <h3>Verified-profile shortlist (top 10)</h3>
+        {topVerifiedProfiles.length > 0 ? (
+          <ol>
+            {topVerifiedProfiles.map((c) => (
+              <li key={`verified-${c.slug}`}>
+                <a href={companyPathFromSlug(c.slug)}>{c.company_name}</a>
+                {' '}· {normalizeCityName(c.city)}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>No active-license + registration overlap in current state sample.</p>
+        )}
       </SectionCard>
 
       <SectionCard title="State filters">
@@ -391,9 +518,9 @@ export default async function StatePage({
       </SectionCard>
 
       <SectionCard title="Sources">
-        <p>Source: OSHA official records</p>
-        <p>Source: State contractor license boards</p>
-        <p>Source: Secretary of State business records</p>
+        <p>Source: <a href="https://www.osha.gov/establishment-search" rel="nofollow noopener" target="_blank">OSHA official records</a></p>
+        <p>Source: <a href={officialLinks.licenseLookup} rel="nofollow noopener" target="_blank">{officialLinks.licenseAgency}</a></p>
+        <p>Source: <a href={officialLinks.registrationLookup} rel="nofollow noopener" target="_blank">{officialLinks.registrationAgency}</a></p>
       </SectionCard>
 
       <SectionCard title="Editorial and verification note">

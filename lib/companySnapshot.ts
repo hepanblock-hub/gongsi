@@ -64,6 +64,34 @@ function getBaseUrl(): string | null {
   return process.env.COMPANY_SNAPSHOT_BASE_URL?.replace(/\/$/, '') ?? null;
 }
 
+function snapshotsDisabled(): boolean {
+  const v = (process.env.SNAPSHOT_DISABLE ?? '').toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
+function getSnapshotToken(): string | null {
+  return (
+    process.env.SNAPSHOT_STORAGE_TOKEN ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_ANON_KEY ??
+    null
+  );
+}
+
+function buildSnapshotCandidates(url: string, token: string | null): string[] {
+  if (!token) return [url];
+  if (!url.includes('/storage/v1/object/public/')) return [url];
+  return [url, url.replace('/storage/v1/object/public/', '/storage/v1/object/authenticated/')];
+}
+
+function buildSnapshotHeaders(token: string | null): HeadersInit | undefined {
+  if (!token) return undefined;
+  return {
+    Authorization: `Bearer ${token}`,
+    apikey: token,
+  };
+}
+
 const SNAPSHOT_DEBUG = process.env.SNAPSHOT_DEBUG === 'true';
 
 /**
@@ -71,8 +99,11 @@ const SNAPSHOT_DEBUG = process.env.SNAPSHOT_DEBUG === 'true';
  * @returns 快照数据，若未找到或未配置则返回 null
  */
 export async function fetchCompanySnapshot(slug: string): Promise<CompanySnapshot | null> {
+  if (snapshotsDisabled()) return null;
   const base = getBaseUrl();
   if (!base) return null;
+  const token = getSnapshotToken();
+  const headers = buildSnapshotHeaders(token);
 
   // slug 可能带 /company/ 前缀，去掉后直接用
   const cleanSlug = slug.replace(/^\/?(company\/)?/, '');
@@ -80,15 +111,21 @@ export async function fetchCompanySnapshot(slug: string): Promise<CompanySnapsho
 
   for (const candidate of candidates) {
     const url = `${base}/${encodeURIComponent(candidate)}.json`;
-    try {
-      const res = await fetch(url, {
-        next: { revalidate: 86400 },
-      });
-      if (!res.ok) continue;
-      if (SNAPSHOT_DEBUG) console.info(`[snapshot-hit] company/${candidate}.json`);
-      return (await res.json()) as CompanySnapshot;
-    } catch {
-      continue;
+    for (const requestUrl of buildSnapshotCandidates(url, token)) {
+      try {
+        const res = await fetch(requestUrl, {
+          headers,
+          next: { revalidate: 86400 },
+        });
+        if (!res.ok) {
+          if (SNAPSHOT_DEBUG) console.info(`[snapshot-miss] company/${candidate}.json status=${res.status}`);
+          continue;
+        }
+        if (SNAPSHOT_DEBUG) console.info(`[snapshot-hit] company/${candidate}.json`);
+        return (await res.json()) as CompanySnapshot;
+      } catch {
+        continue;
+      }
     }
   }
 

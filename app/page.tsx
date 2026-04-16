@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import PageTitle from '../components/common/PageTitle';
 import SectionCard from '../components/common/SectionCard';
+import JsonLd from '../components/seo/JsonLd';
 import { getRecentCompanyPages } from '../lib/queries';
 import { fetchRecentSnapshot } from '../lib/rootSnapshot';
-import { companyPathFromSlug } from '../lib/site';
+import { companyPathFromSlug, SITE_URL } from '../lib/site';
 
 function recordTypeLabel(hasOsha: boolean, hasLicense: boolean, hasRegistration: boolean): string {
   const count = [hasOsha, hasLicense, hasRegistration].filter(Boolean).length;
@@ -39,8 +40,35 @@ export default async function HomePage() {
     florida: 'Florida contractor license and OSHA records lookup',
   };
 
+  const homeUrl = `${SITE_URL}/`;
+  const organizationJsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${homeUrl}#organization`,
+    name: 'Compliance Lookup',
+    url: SITE_URL,
+    areaServed: 'United States',
+  };
+
+  const datasetJsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    '@id': `${homeUrl}#dataset`,
+    name: 'Compliance Lookup Public Company Compliance Dataset',
+    description: 'Aggregated public OSHA inspections, contractor licenses, and business registration records used for company compliance lookup.',
+    url: homeUrl,
+    isAccessibleForFree: true,
+    inLanguage: 'en-US',
+    creator: { '@type': 'Organization', '@id': `${homeUrl}#organization` },
+    publisher: { '@type': 'Organization', '@id': `${homeUrl}#organization` },
+    keywords: ['OSHA', 'contractor license', 'business registration', 'company compliance', 'public records'],
+  };
+
   return (
     <main className="container">
+      <JsonLd data={organizationJsonLd} />
+      <JsonLd data={datasetJsonLd} />
+
       <section className="hero-grid">
         <div>
           <PageTitle
