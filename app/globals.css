@@ -54,8 +54,15 @@ a:hover {
 }
 
 .brand {
-  font-weight: 700;
-  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.brand-logo {
+  display: block;
+  width: 220px;
+  height: auto;
 }
 
 .nav-list {

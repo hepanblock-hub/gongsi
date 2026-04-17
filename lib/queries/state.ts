@@ -77,6 +77,8 @@ function normalizeCityForUi(rawCity: string): string {
     (withoutStateSuffix.includes(',') && withoutStateSuffix.length > 18) ||
     withoutStateSuffix.length > 40;
 
+  if (/^[-–—\s]{1,10}$/.test(withoutStateSuffix)) return 'Unknown';
+
   if (isAddressLike || /^(-\s*select\s*-|select|unknown|n\/?a)$/i.test(withoutStateSuffix)) {
     return 'Unknown';
   }
@@ -348,6 +350,7 @@ export async function getIndexedStateCitiesMap(): Promise<Record<string, string[
      WHERE cp.company_name ~* '[A-Za-z]'
        AND lower(trim(cp.company_name)) <> '- select -'
        AND trim(coalesce(cp.state, '')) <> ''
+       AND trim(coalesce(cp.city, '')) NOT SIMILAR TO '[-–—\s]{1,10}'
      GROUP BY 1, 2
      ORDER BY 1, 2`
     );

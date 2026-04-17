@@ -34,9 +34,10 @@ export default async function HomePage() {
   } catch {
     rows = [];
   }
-  const popularStates = ['california', 'florida'];
+  const popularStates = ['california', 'texas', 'florida'];
   const stateSeoText: Record<string, string> = {
     california: 'California contractor license and OSHA records lookup',
+    texas: 'Texas contractor license and OSHA records lookup',
     florida: 'Florida contractor license and OSHA records lookup',
   };
 
@@ -106,26 +107,59 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="cards">
-        <SectionCard title="Popular searches">
+      <section>
+        <SectionCard title="What are OSHA violations and why they matter">
+          <p>
+            OSHA violations are official records of workplace safety inspections conducted by the Occupational Safety and Health Administration.
+            These records can include citations, penalties, and injury-linked inspection outcomes.
+          </p>
+          <p>
+            Checking OSHA history before hiring a contractor, subcontractor, or vendor helps buyers evaluate safety performance and compliance behavior.
+            Many users search these records to compare companies, reduce operational risk, and document due diligence in procurement workflows.
+          </p>
+          <p>
+            Compliance Lookup combines OSHA inspection visibility with contractor license and business registration records,
+            so users can run a unified company compliance check instead of reviewing disconnected portals one by one.
+          </p>
           <ul>
-            <li>Search OSHA violations by company name</li>
-            <li>Check contractor license status online</li>
-            <li>Verify company registration status</li>
-            <li>Look up workplace safety records</li>
+            <li>Verify contractor safety performance before contract award</li>
+            <li>Assess risk before hiring by reviewing inspection history</li>
+            <li>Compare companies with the same city/state scope</li>
           </ul>
         </SectionCard>
-        <SectionCard title="OSHA Violations">
-          <p>Find inspection records, violation types, and penalties.</p>
-          <a href="/state/california/filter/osha">Browse OSHA records</a>
+      </section>
+
+      <section className="cards">
+        <SectionCard title="OSHA violations lookup tool">
+          <p>
+            Use this entry when your primary search intent is workplace safety history. It helps you find OSHA-focused company records,
+            review inspection counts, and identify injury-linked patterns where available in public datasets.
+            This is the fastest route for users searching terms like “OSHA violations lookup” or “OSHA violations by company”.
+          </p>
+          <p>
+            Start here: <a href="/state/california/filter/osha">OSHA violations by company</a>
+          </p>
         </SectionCard>
-        <SectionCard title="Contractor License Status">
-          <p>Check active, expired, suspended, or unknown license states.</p>
-          <a href="/state/california/filter/license-only">Browse license records</a>
+        <SectionCard title="Contractor license lookup by state">
+          <p>
+            Use this entry when you need license standing validation before hiring. You can quickly review active, expired, suspended,
+            or unknown license signals, then continue to official state board verification for final legal status.
+            This section supports high-intent queries such as “contractor license lookup” and state-specific checks.
+          </p>
+          <p>
+            Start here: <a href="/state/california/filter/license-only">California contractor license lookup</a> ·{' '}
+            <a href="/state/texas/filter/license-only">Texas contractor license lookup</a>
+          </p>
         </SectionCard>
-        <SectionCard title="Company Registration Status">
-          <p>Review active, inactive, or dissolved registration status.</p>
-          <a href="/state/california/filter/registration-only">Browse registration records</a>
+        <SectionCard title="Business registration verification">
+          <p>
+            Use this entry to validate whether a company appears with active, inactive, or dissolved registration signals.
+            Registration checks are critical for vendor onboarding, procurement compliance, and entity verification workflows,
+            especially when multiple similarly named companies exist in the same market.
+          </p>
+          <p>
+            Start here: <a href="/state/california/filter/registration-only">Business registration verification</a>
+          </p>
         </SectionCard>
       </section>
 
@@ -174,6 +208,35 @@ export default async function HomePage() {
           This site shows public records only. Data is aggregated from official sources and updated periodically.
           No subjective company ratings are provided.
         </p>
+      </section>
+
+      <section className="cards">
+        <SectionCard title="Data sources and verification model">
+          <p>
+            All compliance records on this platform are sourced from official government systems, including OSHA inspection datasets,
+            state contractor licensing boards, and Secretary of State business registries.
+          </p>
+          <p>
+            Data is normalized for name matching and updated in periodic ingestion cycles to reflect the latest publicly available records.
+            For high-stakes legal or procurement decisions, users should verify final status directly on official agency portals.
+          </p>
+          <p>
+            See: <a href="/methodology">Methodology</a> · <a href="/sources">Official sources</a>
+          </p>
+        </SectionCard>
+        <SectionCard title="Who uses compliance lookup tools">
+          <ul>
+            <li>Homeowners verifying contractors before hiring</li>
+            <li>Businesses screening vendors and subcontractors</li>
+            <li>Job seekers reviewing employer safety records</li>
+            <li>Procurement teams conducting due diligence</li>
+          </ul>
+          <p>
+            High-intent shortcuts: <a href="/state/california">California contractor license lookup</a> ·{' '}
+            <a href="/state/florida">Florida contractor license lookup</a> ·{' '}
+            <a href="/state/california/filter/osha">OSHA violations by company</a>
+          </p>
+        </SectionCard>
       </section>
 
       <section className="cards">

@@ -16,15 +16,68 @@ import { fileURLToPath } from 'node:url';
 import dns from 'node:dns/promises';
 import { sanitizeSnapshotPath } from '../lib/snapshotKey';
 
-// ─── 配置 ────────────────────────────────────────────────────────────────────
-const PROJECT_REF      = process.env.SUPABASE_PROJECT_REF || 'ioclagkqoytlqqacrese';
-const SUPABASE_URL     = process.env.SUPABASE_URL || `https://${PROJECT_REF}.supabase.co`;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvY2xhZ2txb3l0bGxxYWNyZXNlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTQzOTc5OCwiZXhwIjoyMDkxMDE1Nzk4fQ.dH5tNv_GTrKLlUz3ojD7kng1dZ7304xnW6jlC4J3eGA';
-const BUCKET           = process.env.SNAPSHOT_BUCKET || 'gongsihegui';
+function loadEnvFile(envPath: string) {
+  if (!fsSync.existsSync(envPath)) return;
+  const lines = fsSync.readFileSync(envPath, 'utf8').split(/\r?\n/);
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const sep = line.indexOf('=');
+    if (sep <= 0) continue;
+    const key = line.slice(0, sep).trim();
+    let val = line.slice(sep + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (!process.env[key]) process.env[key] = val;
+  }
+}
 
+function extractProjectRefFromUrl(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    const match = url.hostname.match(/^([a-z0-9]+)\.supabase\.co$/i);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function extractProjectRefFromDatabaseUrl(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    // 从用户名提取项目 ref：postgres.ioclagkqoytllqacrese → ioclagkqoytllqacrese
+    const userWithProj = url.username;
+    const match = userWithProj.match(/^postgres\.([a-z0-9]+)$/i);
+    if (match?.[1]) return match[1];
+    // 备选：从 hostname 提取（适配不同的连接格式）
+    const hostMatch = url.hostname.match(/^postgres\.([a-z0-9]+)\./i);
+    return hostMatch?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── 配置 ────────────────────────────────────────────────────────────────────
 const scriptDir  = path.dirname(fileURLToPath(import.meta.url));
 const ROOT       = path.resolve(scriptDir, '..');
+
+for (const envName of ['.env', '.env.local', '.env.production', '.env.production.local']) {
+  loadEnvFile(path.join(ROOT, envName));
+}
+
+const PROJECT_REF =
+  process.env.SUPABASE_PROJECT_REF
+  || extractProjectRefFromUrl(process.env.SUPABASE_URL)
+  || extractProjectRefFromUrl(process.env.COMPANY_SNAPSHOT_BASE_URL)
+  || extractProjectRefFromDatabaseUrl(process.env.DATABASE_URL)
+  || '';
+
+const SUPABASE_URL = process.env.SUPABASE_URL || (PROJECT_REF ? `https://${PROJECT_REF}.supabase.co` : '');
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const BUCKET           = process.env.SNAPSHOT_BUCKET || 'gongsihegui';
 const DATA_ROOT  = process.env.SNAPSHOT_DATA_ROOT || path.join(ROOT, 'kuaizhao', 'data');
 
 // 默认更稳：并发 8，失败自动重试
@@ -209,12 +262,27 @@ async function uploadWithPool(files: string[], doneSet: Set<string>) {
 
 // ─── 主函数 ──────────────────────────────────────────────────────────────────
 async function main() {
+  if (!SUPABASE_URL) {
+    throw new Error('缺少 SUPABASE_URL，且无法从 SUPABASE_PROJECT_REF / COMPANY_SNAPSHOT_BASE_URL / DATABASE_URL 自动推导。');
+  }
+
+  if (!SERVICE_ROLE_KEY) {
+    throw new Error('缺少 SUPABASE_SERVICE_ROLE_KEY。请在环境变量或 .env.production 中设置后重试。');
+  }
+
+  const SKIP_DNS_CHECK = (process.env.SUPABASE_SKIP_DNS_CHECK ?? 'false') === 'true';
+
   let host = '';
   try {
     host = new URL(SUPABASE_URL).hostname;
-    await dns.lookup(host);
-  } catch {
-    throw new Error(`SUPABASE_URL 无法解析 DNS：${SUPABASE_URL}。请在 Supabase 控制台复制 Project Settings -> API -> URL，设置环境变量 SUPABASE_URL 后重试。`);
+    if (!SKIP_DNS_CHECK) {
+      await dns.lookup(host);
+    }
+  } catch (e) {
+    if (!SKIP_DNS_CHECK) {
+      throw new Error(`SUPABASE_URL 无法解析 DNS：${SUPABASE_URL}。请在 Supabase 控制台复制 Project Settings -> API -> URL，设置环境变量 SUPABASE_URL 后重试。`);
+    }
+    console.warn(`[upload] 跳过 DNS 校验 (SUPABASE_SKIP_DNS_CHECK=true)，继续使用 host: ${host || SUPABASE_URL}`);
   }
 
   console.log('▶ 快照上传到 Supabase Storage');

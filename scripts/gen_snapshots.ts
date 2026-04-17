@@ -110,6 +110,7 @@ const SKIP_HOME_PHASE    = (process.env.SNAPSHOT_SKIP_HOME    ?? 'false') === 't
 const SKIP_COMPANY_PHASE = (process.env.SNAPSHOT_SKIP_COMPANY ?? 'false') === 'true';
 const SKIP_STATE_PHASE   = (process.env.SNAPSHOT_SKIP_STATE   ?? 'false') === 'true';
 const SNAPSHOT_STATE     = (process.env.SNAPSHOT_STATE ?? 'california').toLowerCase();
+const SNAPSHOT_STATES    = SNAPSHOT_STATE.split(',').map(s => s.trim()).filter(Boolean);
 
 // ─── 主函数 ──────────────────────────────────────────────────────────────────
 async function main() {
@@ -152,26 +153,37 @@ async function main() {
 
   // ── [1/4] 查询全部公司 ──────────────────────────────────────────────────────
   console.log('\n[1/4] 查询全部 company_pages …');
-  const stateFilter = SNAPSHOT_STATE === 'california'
-    ? "(lower(trim(state)) IN ('ca','california') OR lower(regexp_replace(state, '\\s+', '-', 'g')) = 'california')"
-    : "(lower(regexp_replace(state, '\\s+', '-', 'g')) = $1 OR lower(trim(state)) = $1)";
+  
+  // 构建多州过滤条件
+  const conditions: string[] = [];
+  const params: string[] = [];
+  let paramIdx = 1;
+  
+  for (const state of SNAPSHOT_STATES) {
+    if (state === 'california') {
+      conditions.push("(lower(trim(state)) IN ('ca','california') OR lower(regexp_replace(state, '\\s+', '-', 'g')) = 'california')");
+    } else {
+      conditions.push(`(lower(regexp_replace(state, '\\s+', '-', 'g')) = $${paramIdx} OR lower(trim(state)) = $${paramIdx})`);
+      params.push(state);
+      paramIdx++;
+    }
+  }
+  
+  const stateFilter = conditions.join(' OR ');
 
   const baseSql = `SELECT slug, company_name, lower(trim(state)) AS state, city
      FROM company_pages
      WHERE company_name ~* '[A-Za-z]'
        AND lower(trim(company_name)) <> '- select -'
-       AND ${stateFilter}
+       AND (${stateFilter})
      ORDER BY id ASC`;
 
-  const { rows: allRows } = SNAPSHOT_STATE === 'california'
-    ? await pool.query<{
-        slug: string; company_name: string; state: string; city: string | null;
-      }>(baseSql)
-    : await pool.query<{
-        slug: string; company_name: string; state: string; city: string | null;
-      }>(baseSql, [SNAPSHOT_STATE]);
+  const { rows: allRows } = await pool.query<{
+    slug: string; company_name: string; state: string; city: string | null;
+  }>(baseSql, params);
+  
   const rows = rowLimit > 0 ? allRows.slice(0, rowLimit) : allRows;
-  console.log(`  州: ${SNAPSHOT_STATE}`);
+  console.log(`  州: ${SNAPSHOT_STATES.join(', ')}`);
   console.log(`  总计: ${allRows.length} | 执行: ${rows.length}${rowLimit > 0 ? '  ⚠ 调试限制' : ''}`);
   console.log(`  批次大小: ${BATCH_SIZE} | 预计批次数: ${Math.ceil(rows.length / BATCH_SIZE)}`);
 

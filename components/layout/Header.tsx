@@ -19,7 +19,15 @@ export default async function Header() {
   return (
     <header className="site-header">
       <div className="container header-inner">
-        <a href="/" className="brand">Compliance Lookup</a>
+        <a href="/" className="brand" aria-label="Compliance Lookup home">
+          <img
+            src="/logo-compliance-lookup.svg"
+            alt="Compliance Lookup"
+            className="brand-logo"
+            width={220}
+            height={44}
+          />
+        </a>
 
         <Suspense fallback={<div className="header-search" aria-hidden="true" />}>
           <HeaderSearch states={states} citiesByState={citiesByState} />

@@ -138,6 +138,7 @@ async function writeJson(filePath: string, data: unknown) {
 const STATE_SLUG_TO_CODES: Record<string, string[]> = {
   california: ['ca', 'california'],
   florida: ['fl', 'florida'],
+  texas: ['tx', 'texas'],
 };
 
 function getStateCodes(stateSlug: string): string[] {
