@@ -119,7 +119,7 @@ async function main() {
 
   loadEnvFile(path.join(ROOT, '.env'));
 
-  const DATA_ROOT   = path.join(ROOT, 'kuaizhao', 'data');
+  const DATA_ROOT   = process.env.SNAPSHOT_DATA_ROOT || path.join(ROOT, 'kuaizhao', 'data');
   const COMPANY_DIR = path.join(DATA_ROOT, 'company');
   const STATE_DIR   = path.join(DATA_ROOT, 'state');
 
@@ -154,19 +154,27 @@ async function main() {
   // ── [1/4] 查询全部公司 ──────────────────────────────────────────────────────
   console.log('\n[1/4] 查询全部 company_pages …');
   
-  // 构建多州过滤条件
+  // 构建多州过滤条件（支持州全称 + 缩写）
   const conditions: string[] = [];
-  const params: string[] = [];
+  const params: string[][] = [];
   let paramIdx = 1;
+
+  const STATE_ALIAS_MAP: Record<string, string[]> = {
+    california: ['california', 'ca'],
+    florida: ['florida', 'fl'],
+    texas: ['texas', 'tx'],
+  };
   
   for (const state of SNAPSHOT_STATES) {
-    if (state === 'california') {
-      conditions.push("(lower(trim(state)) IN ('ca','california') OR lower(regexp_replace(state, '\\s+', '-', 'g')) = 'california')");
-    } else {
-      conditions.push(`(lower(regexp_replace(state, '\\s+', '-', 'g')) = $${paramIdx} OR lower(trim(state)) = $${paramIdx})`);
-      params.push(state);
-      paramIdx++;
-    }
+    const aliases = Array.from(new Set([
+      ...(STATE_ALIAS_MAP[state] ?? []),
+      state,
+      state.replace(/-/g, ' '),
+    ].map((s) => s.toLowerCase().trim()).filter(Boolean)));
+
+    conditions.push(`(lower(trim(state)) = ANY($${paramIdx}::text[]) OR lower(regexp_replace(state, '\\s+', '-', 'g')) = ANY($${paramIdx}::text[]))`);
+    params.push(aliases);
+    paramIdx++;
   }
   
   const stateFilter = conditions.join(' OR ');

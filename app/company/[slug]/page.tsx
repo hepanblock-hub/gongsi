@@ -263,9 +263,10 @@ async function safeDbCall<T>(label: string, fn: () => Promise<T>, fallback: T): 
 }
 
 function shouldAllowCompanyDbFallback(): boolean {
-  const hasSnapshotBase = Boolean(process.env.COMPANY_SNAPSHOT_BASE_URL);
-  const allowFallback = (process.env.COMPANY_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase() === 'true';
-  return !hasSnapshotBase || allowFallback;
+  // 需求：快照优先，但默认允许数据库兜底，避免快照缺失直接 404。
+  // 如需强制禁用 DB 兜底，可显式设置 COMPANY_SNAPSHOT_DB_FALLBACK=false。
+  const raw = (process.env.COMPANY_SNAPSHOT_DB_FALLBACK ?? 'true').toLowerCase();
+  return !['false', '0', 'no', 'off'].includes(raw);
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -299,7 +300,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
           getRegistrationsByCompany(page.company_name, page.state, 200),
         ]),
         [[], [], []]
-      );
+      )
     : [[], [], []];
 
   const hasOsha = osha.length > 0;
@@ -387,7 +388,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
           getRegistrationsByCompany(page.company_name, page.state, 200),
         ]),
         [[], [], []]
-      );
+      )
     : [[], [], []];
 
   const [timeline, related] = snapshot
@@ -403,7 +404,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
           getRelatedCompanies(page.company_name, page.state, page.city, 6, page.slug),
         ]),
         [[], []]
-      );
+      )
     : [[], []];
 
   const [detailedLocation, cityBenchmark] = snapshot
@@ -419,7 +420,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
           getCityComplianceBenchmark(page.state, page.city),
         ]),
         [null, null]
-      );
+      )
     : [null, null];
 
   const latestInspection = osha[0]?.inspection_date ?? null;
