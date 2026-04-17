@@ -262,24 +262,36 @@ async function safeDbCall<T>(label: string, fn: () => Promise<T>, fallback: T): 
   }
 }
 
+function shouldAllowCompanyDbFallback(): boolean {
+  const hasSnapshotBase = Boolean(process.env.COMPANY_SNAPSHOT_BASE_URL);
+  const allowFallback = (process.env.COMPANY_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase() === 'true';
+  return !hasSnapshotBase || allowFallback;
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const fullSlug = companyPathFromSlug(slug);
+  const allowDbFallback = shouldAllowCompanyDbFallback();
 
   // 快照优先，DB兜底
   const snapshot = await fetchCompanySnapshot(slug);
-  const routePage = snapshot?.routing ?? await safeDbCall('getCompanyBySlugForRouting(metadata)', () => getCompanyBySlugForRouting(fullSlug), null);
+  const routePage = snapshot?.routing ?? (allowDbFallback
+    ? await safeDbCall('getCompanyBySlugForRouting(metadata)', () => getCompanyBySlugForRouting(fullSlug), null)
+    : null);
 
   if (!routePage) return { title: 'Company not found' };
 
-  const page = snapshot?.detail ?? await safeDbCall('getCompanyBySlug(metadata)', () => getCompanyBySlug(fullSlug), null);
+  const page = snapshot?.detail ?? (allowDbFallback
+    ? await safeDbCall('getCompanyBySlug(metadata)', () => getCompanyBySlug(fullSlug), null)
+    : null);
   if (!page) return { title: 'Company not found' };
   const entityLooksReal = isLikelyRealCompanyName(page.company_name);
   const stateName = fullStateName(page.state);
   const stateCode = Object.entries(STATE_CODE_TO_NAME).find(([, v]) => v === stateName)?.[0] ?? stateName;
   const [osha, licenses, registrations] = snapshot
-    ? [snapshot.osha, snapshot.licenses, snapshot.registrations]
-    : await safeDbCall(
+    ? [snapshot.osha ?? [], snapshot.licenses ?? [], snapshot.registrations ?? []]
+    : allowDbFallback
+    ? await safeDbCall(
         'company metadata records',
         () => Promise.all([
           getOshaByCompany(page.company_name, page.state, 200),
@@ -288,6 +300,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
         ]),
         [[], [], []]
       );
+    : [[], [], []];
 
   const hasOsha = osha.length > 0;
   const hasLicense = licenses.length > 0;
@@ -349,18 +362,24 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function CompanyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const fullSlug = companyPathFromSlug(slug);
+  const allowDbFallback = shouldAllowCompanyDbFallback();
 
   // 快照优先，DB兜底
   const snapshot = await fetchCompanySnapshot(slug);
-  const routePage = snapshot?.routing ?? await safeDbCall('getCompanyBySlugForRouting(page)', () => getCompanyBySlugForRouting(fullSlug), null);
+  const routePage = snapshot?.routing ?? (allowDbFallback
+    ? await safeDbCall('getCompanyBySlugForRouting(page)', () => getCompanyBySlugForRouting(fullSlug), null)
+    : null);
   if (!routePage) notFound();
 
-  const page = snapshot?.detail ?? await safeDbCall('getCompanyBySlug(page)', () => getCompanyBySlug(fullSlug), null);
+  const page = snapshot?.detail ?? (allowDbFallback
+    ? await safeDbCall('getCompanyBySlug(page)', () => getCompanyBySlug(fullSlug), null)
+    : null);
   if (!page) notFound();
 
   const [osha, licenses, registrations] = snapshot
-    ? [snapshot.osha, snapshot.licenses, snapshot.registrations]
-    : await safeDbCall(
+    ? [snapshot.osha ?? [], snapshot.licenses ?? [], snapshot.registrations ?? []]
+    : allowDbFallback
+    ? await safeDbCall(
         'company page records',
         () => Promise.all([
           getOshaByCompany(page.company_name, page.state, 200),
@@ -369,13 +388,15 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         ]),
         [[], [], []]
       );
+    : [[], [], []];
 
   const [timeline, related] = snapshot
     ? await Promise.all([
-        snapshot.timeline ?? getCompanyTimeline(page.company_name, page.state, 12),
-        snapshot.related ?? getRelatedCompanies(page.company_name, page.state, page.city, 6, page.slug),
+        snapshot.timeline ?? (allowDbFallback ? getCompanyTimeline(page.company_name, page.state, 12) : Promise.resolve([])),
+        snapshot.related ?? (allowDbFallback ? getRelatedCompanies(page.company_name, page.state, page.city, 6, page.slug) : Promise.resolve([])),
       ])
-    : await safeDbCall(
+    : allowDbFallback
+    ? await safeDbCall(
         'company timeline/related',
         () => Promise.all([
           getCompanyTimeline(page.company_name, page.state, 12),
@@ -383,13 +404,15 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         ]),
         [[], []]
       );
+    : [[], []];
 
   const [detailedLocation, cityBenchmark] = snapshot
     ? await Promise.all([
-        snapshot.location ?? getCompanyDetailedLocation(page.company_name, page.state),
-        snapshot.benchmark ?? getCityComplianceBenchmark(page.state, page.city),
+        snapshot.location ?? (allowDbFallback ? getCompanyDetailedLocation(page.company_name, page.state) : Promise.resolve(null)),
+        snapshot.benchmark ?? (allowDbFallback ? getCityComplianceBenchmark(page.state, page.city) : Promise.resolve(null)),
       ])
-    : await safeDbCall(
+    : allowDbFallback
+    ? await safeDbCall(
         'company location/benchmark',
         () => Promise.all([
           getCompanyDetailedLocation(page.company_name, page.state),
@@ -397,6 +420,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         ]),
         [null, null]
       );
+    : [null, null];
 
   const latestInspection = osha[0]?.inspection_date ?? null;
   const latestLicenseStatus = licenses[0]?.status ?? 'unknown';
