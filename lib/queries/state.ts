@@ -334,6 +334,82 @@ export async function getIndexedStates(): Promise<Array<{ slug: string; name: st
   return slugs.map((slug) => ({ slug, name: stateSlugToName(slug) }));
 }
 
+/**
+ * 按州 + 城市 slug 查询公司列表（城市页 DB 兜底用）
+ */
+export async function getCityCompanyPagesWithCategory(
+  stateSlug: string,
+  citySlug: string,
+  limit = 500
+): Promise<StateCompanyCategoryRow[]> {
+  const stateName = stateSlugToName(stateSlug);
+  const stateCode = STATE_NAME_TO_CODE[stateName.toLowerCase()] ?? '';
+  const releaseVersion = await getReleaseVisibilityVersion();
+  return queryWithSnapshot(
+    'query_getCityCompanyPagesWithCategory',
+    { stateSlug, citySlug, limit, releaseVersion, queryVersion: RELEASE_QUERY_VERSION },
+    async () => {
+      const { rows } = await pool.query<StateCompanyCategoryRow>(
+        `SELECT
+          cp.slug,
+          cp.company_name,
+          cp.state,
+          cp.city,
+          cp.updated_at::text,
+          EXISTS (
+            SELECT 1 FROM osha_inspections oi
+            WHERE oi.normalized_name = normalize_company_name(cp.company_name)
+              AND lower(oi.state) = lower(cp.state)
+              AND oi.inspection_date IS NOT NULL
+          ) AS has_osha,
+          EXISTS (
+            SELECT 1 FROM contractor_licenses cl
+            WHERE cl.normalized_name = normalize_company_name(cp.company_name)
+              AND lower(cl.state) = lower(cp.state)
+              AND cl.issue_date IS NOT NULL
+          ) AS has_license,
+          EXISTS (
+            SELECT 1 FROM company_registrations cr
+            WHERE cr.normalized_name = normalize_company_name(cp.company_name)
+              AND lower(cr.state) = lower(cp.state)
+              AND cr.incorporation_date IS NOT NULL
+          ) AS has_registration,
+          (SELECT COUNT(*)::int FROM osha_inspections oi
+            WHERE oi.normalized_name = normalize_company_name(cp.company_name)
+              AND lower(oi.state) = lower(cp.state)
+              AND oi.inspection_date IS NOT NULL) AS osha_count,
+          (SELECT COUNT(*)::int FROM osha_inspections oi
+            WHERE oi.normalized_name = normalize_company_name(cp.company_name)
+              AND lower(oi.state) = lower(cp.state)
+              AND oi.inspection_date IS NOT NULL
+              AND (oi.severity ~ '^injury_count:[0-9]+$' OR oi.severity ~ '^fatality:[0-9]+$')
+          ) AS injury_count,
+          (SELECT MAX(oi.inspection_date)::text FROM osha_inspections oi
+            WHERE oi.normalized_name = normalize_company_name(cp.company_name)
+              AND lower(oi.state) = lower(cp.state)
+              AND oi.inspection_date IS NOT NULL) AS latest_inspection_date,
+          (SELECT cl.status FROM contractor_licenses cl
+            WHERE cl.normalized_name = normalize_company_name(cp.company_name)
+              AND lower(cl.state) = lower(cp.state)
+            ORDER BY cl.issue_date DESC NULLS LAST LIMIT 1) AS license_status
+       FROM company_pages cp
+       WHERE cp.company_name ~* '[A-Za-z]'
+         AND lower(trim(cp.company_name)) <> '- select -'
+         AND (
+           lower(regexp_replace(cp.state, '\\s+', '-', 'g')) = $1
+          OR lower(cp.state) = lower($2)
+          OR lower(cp.state) = lower($3)
+         )
+         AND lower(regexp_replace(trim(coalesce(cp.city, '')), '\\s+', '-', 'g')) = $4
+       ORDER BY cp.company_name ASC
+       LIMIT $5`,
+        [normalizeStateSlug(stateSlug), stateName, stateCode, citySlug, limit]
+      );
+      return rows;
+    }
+  );
+}
+
 export async function getIndexedStateCitiesMap(): Promise<Record<string, string[]>> {
   const releaseVersion = await getReleaseVisibilityVersion();
   return queryWithSnapshot('query_getIndexedStateCitiesMap', { releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {

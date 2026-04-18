@@ -4,9 +4,18 @@ import Breadcrumbs from '../../../../../components/common/Breadcrumbs';
 import PageTitle from '../../../../../components/common/PageTitle';
 import SectionCard from '../../../../../components/common/SectionCard';
 import JsonLd from '../../../../../components/seo/JsonLd';
-import { type StateCompanyCategoryRow } from '../../../../../lib/queries';
+import { type StateCompanyCategoryRow, getCityCompanyPagesWithCategory } from '../../../../../lib/queries';
 import { companyPathFromSlug, SITE_URL, stateSlugToName } from '../../../../../lib/site';
 import { fetchCitySnapshot } from '../../../../../lib/citySnapshot';
+
+function shouldAllowCityDbFallback(): boolean {
+  const raw = (process.env.CITY_SNAPSHOT_DB_FALLBACK ?? 'true').toLowerCase();
+  return !['false', '0', 'no', 'off'].includes(raw);
+}
+
+async function safeDbCityCall<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try { return await fn(); } catch { return fallback; }
+}
 
 export const revalidate = 86400;
 export const dynamic = 'force-static';
@@ -218,11 +227,12 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
 export default async function StateCityPage({ params }: { params: Promise<{ stateSlug: string; citySlug: string }> }) {
   const { stateSlug, citySlug: targetCitySlug } = await params;
   const citySnapshot = await fetchCitySnapshot(stateSlug, targetCitySlug);
+  const allowDbFallback = shouldAllowCityDbFallback();
   const stateName = stateSlugToName(stateSlug);
   const stateCode = stateCodeOf(stateName);
   const officialLinks = officialLinksForState(stateSlug);
 
-  const companies: StateCompanyCategoryRow[] = citySnapshot?.companies?.length
+  let companies: StateCompanyCategoryRow[] = citySnapshot?.companies?.length
     ? citySnapshot.companies
       .map((c) => ({
         ...c,
@@ -232,6 +242,15 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
       }))
       .sort(compareCompanies)
     : [];
+
+  // 快照缺失时走 DB 兜底
+  if (!companies.length && allowDbFallback) {
+    const dbRows = await safeDbCityCall(
+      () => getCityCompanyPagesWithCategory(stateSlug, targetCitySlug, 500),
+      []
+    );
+    companies = dbRows.sort(compareCompanies);
+  }
 
   if (!companies.length) notFound();
 
