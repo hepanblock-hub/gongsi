@@ -392,10 +392,10 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
     : [[], [], []];
 
   const [timeline, related] = snapshot
-    ? await Promise.all([
-        snapshot.timeline ?? (allowDbFallback ? getCompanyTimeline(page.company_name, page.state, 12) : Promise.resolve([])),
-        snapshot.related ?? (allowDbFallback ? getRelatedCompanies(page.company_name, page.state, page.city, 6, page.slug) : Promise.resolve([])),
-      ])
+    ? [
+        snapshot.timeline ?? [],
+        snapshot.related ?? [],
+      ]
     : allowDbFallback
     ? await safeDbCall(
         'company timeline/related',
@@ -408,10 +408,10 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
     : [[], []];
 
   const [detailedLocation, cityBenchmark] = snapshot
-    ? await Promise.all([
-        snapshot.location ?? (allowDbFallback ? getCompanyDetailedLocation(page.company_name, page.state) : Promise.resolve(null)),
-        snapshot.benchmark ?? (allowDbFallback ? getCityComplianceBenchmark(page.state, page.city) : Promise.resolve(null)),
-      ])
+    ? [
+        snapshot.location ?? null,
+        snapshot.benchmark ?? null,
+      ]
     : allowDbFallback
     ? await safeDbCall(
         'company location/benchmark',
@@ -506,15 +506,6 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
   const locationCityState = page.city
     ? `${page.city}, ${stateName}`
     : stateName;
-  const mapQuery = detailedLocation
-    ? `${page.company_name} ${detailedLocation}`
-    : null;
-  const mapEmbedUrl = mapQuery
-    ? `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`
-    : null;
-  const mapOpenUrl = mapQuery
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`
-    : null;
 
   const oshaFaqAnswer = osha.length > 0
     ? (() => {
@@ -580,7 +571,6 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
       ? {
         address: {
           '@type': 'PostalAddress',
-          ...(detailedLocation ? { streetAddress: detailedLocation } : {}),
           ...(page.city ? { addressLocality: page.city } : {}),
           ...(page.state ? { addressRegion: page.state } : {}),
           addressCountry: 'US',
@@ -744,18 +734,10 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         <p className="muted">{freshnessLine}</p>
       </SectionCard>
 
-      {detailedLocation && mapEmbedUrl && mapOpenUrl && (
+      {detailedLocation && (
         <SectionCard title="Location">
-          <p>This company is located in {locationCityState}.</p>
-          <p><strong>Address reference:</strong> {detailedLocation}</p>
-          <iframe
-            src={mapEmbedUrl}
-            title={`${page.company_name} map`}
-            className="location-map"
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-          />
-          <p><a href={mapOpenUrl} target="_blank" rel="noopener noreferrer nofollow">View on Google Maps</a></p>
+          <p>{detailedLocation}</p>
+          <p className="muted">Location context is provided as narrative screening text from the current snapshot.</p>
         </SectionCard>
       )}
 

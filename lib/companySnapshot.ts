@@ -54,10 +54,24 @@ export interface CompanySnapshot {
     registered_agent: string | null;
     source_url: string | null;
   }>;
-  timeline: null;
-  related: null;
-  location: null;
-  benchmark: null;
+  timeline: Array<{
+    event_date: string | null;
+    event_type: string;
+    detail: string | null;
+  }> | null;
+  related: Array<{
+    slug: string;
+    company_name: string;
+    state: string;
+    city: string | null;
+    updated_at: string | null;
+  }> | null;
+  location: string | null;
+  benchmark: {
+    avgOshaRecords: number;
+    activeLicensePct: number;
+    cityCompanyCount: number;
+  } | null;
 }
 
 function getBaseUrl(): string | null {

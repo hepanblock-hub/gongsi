@@ -105,6 +105,14 @@ function localNorm(name: string): string {
     .trim();
 }
 
+function toCanonicalState(raw: string): string {
+  const s = String(raw ?? '').trim().toLowerCase().replace(/\s+/g, '-');
+  if (s === 'texas' || s === 'tx') return 'tx';
+  if (s === 'florida' || s === 'fl') return 'fl';
+  if (s === 'california' || s === 'ca') return 'ca';
+  return s;
+}
+
 // ─── 分阶段开关 ──────────────────────────────────────────────────────────────
 const SKIP_HOME_PHASE    = (process.env.SNAPSHOT_SKIP_HOME    ?? 'false') === 'true';
 const SKIP_COMPANY_PHASE = (process.env.SNAPSHOT_SKIP_COMPANY ?? 'false') === 'true';
@@ -149,6 +157,7 @@ async function main() {
   const rawLimit   = Number(process.env.SNAPSHOT_COMPANY_LIMIT ?? 0);
   const rowLimit   = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 0;
   const BATCH_SIZE = Math.max(50, Number(process.env.SNAPSHOT_BATCH_SIZE ?? 500));
+  const BATCH_CONCURRENCY = Math.max(1, Number(process.env.SNAPSHOT_BATCH_CONCURRENCY ?? 8));
   const globalStart = Date.now();
 
   // ── [1/4] 查询全部公司 ──────────────────────────────────────────────────────
@@ -198,14 +207,90 @@ async function main() {
   // ── [2/4] 公司快照（批量模式 — 每批 300 家公司一次 SQL 查询）────────────────────
   if (!SKIP_COMPANY_PHASE) {
     console.log(`\n[2/4] 公司快照（wangzhan 批量模式）…`);
+    console.log(`  批次并发: ${BATCH_CONCURRENCY}`);
+
+    // 预计算：按州一次性生成 city benchmark（避免每批重算）
+    const benchmarkByStateCity = new Map<string, { avgOshaRecords: number; activeLicensePct: number; cityCompanyCount: number }>();
+    for (const stateSlug of SNAPSHOT_STATES) {
+      const aliases = Array.from(new Set([
+        ...(STATE_ALIAS_MAP[stateSlug] ?? []),
+        stateSlug,
+        stateSlug.replace(/-/g, ' '),
+      ].map((s) => s.toLowerCase().trim()).filter(Boolean)));
+      if (!aliases.length) continue;
+
+      const canonicalState = toCanonicalState(stateSlug);
+      const { rows: benchmarkRows } = await pool.query<{
+        city: string;
+        avg_osha_records: string;
+        active_license_pct: string;
+        city_company_count: string;
+      }>(
+        `WITH city_companies AS (
+           SELECT
+             lower(trim(cp.city)) AS city,
+             normalize_company_name(cp.company_name) AS normalized_name
+           FROM company_pages cp
+           WHERE cp.company_name ~* '[A-Za-z]'
+             AND lower(trim(cp.company_name)) <> '- select -'
+             AND trim(coalesce(cp.city, '')) <> ''
+             AND (
+               lower(trim(cp.state)) = ANY($1::text[])
+               OR lower(regexp_replace(cp.state, '\\s+', '-', 'g')) = ANY($1::text[])
+             )
+           GROUP BY lower(trim(cp.city)), normalize_company_name(cp.company_name)
+         ),
+         osha_counts AS (
+           SELECT oi.normalized_name, COUNT(*)::int AS osha_count
+           FROM osha_inspections oi
+           WHERE (
+             lower(trim(oi.state)) = ANY($1::text[])
+             OR lower(regexp_replace(oi.state, '\\s+', '-', 'g')) = ANY($1::text[])
+           )
+           GROUP BY oi.normalized_name
+         ),
+         latest_license AS (
+           SELECT DISTINCT ON (cl.normalized_name)
+             cl.normalized_name,
+             lower(coalesce(cl.status, 'unknown')) AS license_status
+           FROM contractor_licenses cl
+           WHERE (
+             lower(trim(cl.state)) = ANY($1::text[])
+             OR lower(regexp_replace(cl.state, '\\s+', '-', 'g')) = ANY($1::text[])
+           )
+           ORDER BY cl.normalized_name, cl.issue_date DESC NULLS LAST, cl.created_at DESC
+         )
+         SELECT
+           cc.city,
+           COALESCE(AVG(COALESCE(oc.osha_count, 0)), 0)::text AS avg_osha_records,
+           COALESCE(AVG(CASE WHEN ll.license_status = 'active' THEN 100 ELSE 0 END), 0)::text AS active_license_pct,
+           COUNT(*)::text AS city_company_count
+         FROM city_companies cc
+         LEFT JOIN osha_counts oc ON oc.normalized_name = cc.normalized_name
+         LEFT JOIN latest_license ll ON ll.normalized_name = cc.normalized_name
+         GROUP BY cc.city`,
+        [aliases]
+      );
+
+      for (const r of benchmarkRows) {
+        const city = (r.city ?? '').trim().toLowerCase();
+        if (!city) continue;
+        benchmarkByStateCity.set(`${canonicalState}|${city}`, {
+          avgOshaRecords: Number(r.avg_osha_records || 0),
+          activeLicensePct: Number(r.active_license_pct || 0),
+          cityCompanyCount: Number(r.city_company_count || 0),
+        });
+      }
+    }
 
     const batches = chunk(rows, BATCH_SIZE);
     let batchIdx = 0;
     let totalWritten = 0;
     let totalSkipped = 0;
 
-    for (const batchRows of batches) {
-      batchIdx++;
+    const processBatch = async (batchRows: typeof rows) => {
+      let written = 0;
+      let skipped = 0;
 
       // ① 先检查哪些文件已存在
       const needWrite: typeof batchRows = [];
@@ -213,15 +298,15 @@ async function main() {
         const slug = normalizeCompanySlug(row.slug);
         const outFile = path.join(COMPANY_DIR, `${slug}.json`);
         if (await fileExists(outFile)) {
-          totalSkipped++;
+          skipped++;
         } else {
           needWrite.push(row);
         }
       }
 
       if (needWrite.length > 0) {
-        const companyNames = needWrite.map(r => r.company_name);
-        const companySlugs = needWrite.map(r => normalizeCompanySlug(r.slug));
+        const companyNames = needWrite.map((r) => r.company_name);
+        const companySlugs = needWrite.map((r) => normalizeCompanySlug(r.slug));
 
         // ② 一次查询拉回这批 300 个公司的全部 osha/license/registration 数据
         const [oshaRes, licenseRes, regRes, detailRes] = await Promise.all([
@@ -343,6 +428,17 @@ async function main() {
           const licKey     = findNormKey(name, licenseByNorm) ?? '';
           const regKey     = findNormKey(name, regByNorm)     ?? '';
 
+          const stateRaw = detail?.state ?? row.state;
+          const cityRaw = detail?.city ?? row.city;
+          const stateKey = toCanonicalState(stateRaw);
+          const cityKey = (cityRaw ?? '').trim().toLowerCase();
+          const locationText = cityRaw
+            ? `${name} operates in ${cityRaw}, ${String(stateRaw).toUpperCase()}.`
+            : `${name} operates in ${String(stateRaw).toUpperCase()}.`;
+          const benchmark = cityKey
+            ? (benchmarkByStateCity.get(`${stateKey}|${cityKey}`) ?? null)
+            : null;
+
           await writeJson(outFile, {
             generatedAt:   new Date().toISOString(),
             slug,
@@ -353,17 +449,32 @@ async function main() {
             registrations: regKey     ? (regByNorm.get(regKey)      ?? []) : [],
             timeline:      null,
             related:       null,
-            location:      null,
-            benchmark:     null,
+            location:      locationText,
+            benchmark,
           });
-          totalWritten++;
+          written++;
         }));
       }
 
-      if (batchIdx % 2 === 0 || batchIdx === batches.length) {
-        printProgress(batchIdx, batches.length, totalWritten, totalSkipped, globalStart);
+      return { written, skipped };
+    };
+
+    let nextBatch = 0;
+    const workers = Array.from({ length: Math.min(BATCH_CONCURRENCY, batches.length) }, async () => {
+      while (true) {
+        const idx = nextBatch++;
+        if (idx >= batches.length) return;
+        const { written, skipped } = await processBatch(batches[idx]);
+        totalWritten += written;
+        totalSkipped += skipped;
+        batchIdx++;
+        if (batchIdx % 2 === 0 || batchIdx === batches.length) {
+          printProgress(batchIdx, batches.length, totalWritten, totalSkipped, globalStart);
+        }
       }
-    }
+    });
+
+    await Promise.all(workers);
 
     console.log(`\n  ✓ 写入: ${totalWritten}, 跳过: ${totalSkipped}`);
     const speed = totalWritten > 0

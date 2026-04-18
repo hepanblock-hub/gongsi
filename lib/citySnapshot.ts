@@ -7,6 +7,13 @@ export interface CitySnapshot {
   generatedAt: string;
   stateSlug: string;
   citySlug: string;
+  cityCompanyCount?: number;
+  stateStats?: {
+    stateCompanyCount: number;
+    oshaCoveragePct: number;
+    licenseCoveragePct: number;
+    registrationCoveragePct: number;
+  };
   companies: Array<{
     slug: string;
     company_name: string;

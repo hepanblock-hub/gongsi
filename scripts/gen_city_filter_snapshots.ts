@@ -252,6 +252,14 @@ async function processState(stateSlug: string) {
   const allCompanies = await loadCompaniesFromDatabase(stateSlug);
   console.log(`  [${stateSlug}] 共 ${allCompanies.length} 家公司`);
 
+  const stateBase = Math.max(1, allCompanies.length);
+  const stateStats = {
+    stateCompanyCount: allCompanies.length,
+    oshaCoveragePct: Number((((allCompanies.filter((c) => c.has_osha).length) / stateBase) * 100).toFixed(1)),
+    licenseCoveragePct: Number((((allCompanies.filter((c) => c.has_license).length) / stateBase) * 100).toFixed(1)),
+    registrationCoveragePct: Number((((allCompanies.filter((c) => c.has_registration).length) / stateBase) * 100).toFixed(1)),
+  };
+
   // 先覆盖 state 快照为全量（避免旧文件仅 5000 条）
   const cityCounts = Array.from(
     allCompanies.reduce((m, c) => {
@@ -313,6 +321,8 @@ async function processState(stateSlug: string) {
       generatedAt: new Date().toISOString(),
       stateSlug,
       citySlug,
+      cityCompanyCount: sorted.length,
+      stateStats,
       companies: sorted,
     });
     cityCount++;

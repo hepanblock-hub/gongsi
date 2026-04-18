@@ -4,7 +4,7 @@ import Breadcrumbs from '../../../../../components/common/Breadcrumbs';
 import PageTitle from '../../../../../components/common/PageTitle';
 import SectionCard from '../../../../../components/common/SectionCard';
 import JsonLd from '../../../../../components/seo/JsonLd';
-import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
+import { type StateCompanyCategoryRow } from '../../../../../lib/queries';
 import { companyPathFromSlug, SITE_URL, stateSlugToName } from '../../../../../lib/site';
 import { fetchCitySnapshot } from '../../../../../lib/citySnapshot';
 
@@ -202,9 +202,8 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   const stateName = stateSlugToName(stateSlug);
   const stateCode = stateCodeOf(stateName);
   const cityName = targetCitySlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-  const thinCityCount = (await getStateCompanyPagesWithCategory(stateSlug, 5000))
-    .filter((c) => citySlug(normalizeCityName(c.city)) === targetCitySlug)
-    .length;
+  const citySnapshot = await fetchCitySnapshot(stateSlug, targetCitySlug);
+  const thinCityCount = citySnapshot?.cityCompanyCount ?? citySnapshot?.companies?.length ?? 0;
   return {
     title: { absolute: `Contractor License Lookup in ${cityName}, ${stateCode} (2026) + OSHA Violations Check` },
     description: `${cityName} ${stateCode} contractor license lookup and OSHA violations check. Compare company risk signals, license status, and shortlist vendors to review first.`,
@@ -221,7 +220,6 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
   const citySnapshot = await fetchCitySnapshot(stateSlug, targetCitySlug);
   const stateName = stateSlugToName(stateSlug);
   const stateCode = stateCodeOf(stateName);
-  const stateCompaniesSample = await getStateCompanyPagesWithCategory(stateSlug, 5000);
   const officialLinks = officialLinksForState(stateSlug);
 
   const companies: StateCompanyCategoryRow[] = citySnapshot?.companies?.length
@@ -233,9 +231,7 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
         license_status: c.license_status ?? null,
       }))
       .sort(compareCompanies)
-    : stateCompaniesSample
-      .filter((c) => citySlug(normalizeCityName(c.city)) === targetCitySlug)
-      .sort(compareCompanies);
+    : [];
 
   if (!companies.length) notFound();
 
@@ -258,10 +254,10 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
   }).length;
   const injuryLinkedCount = companies.filter((c) => (c.injury_count ?? 0) > 0).length;
 
-  const stateBase = Math.max(1, stateCompaniesSample.length);
-  const stateOshaPctNum = Number(toPct(stateCompaniesSample.filter((c) => c.has_osha).length, stateBase));
-  const stateLicensePctNum = Number(toPct(stateCompaniesSample.filter((c) => c.has_license).length, stateBase));
-  const stateRegistrationPctNum = Number(toPct(stateCompaniesSample.filter((c) => c.has_registration).length, stateBase));
+  const stateBase = Math.max(1, citySnapshot?.stateStats?.stateCompanyCount ?? companies.length);
+  const stateOshaPctNum = citySnapshot?.stateStats?.oshaCoveragePct ?? Number(toPct(oshaCount, base));
+  const stateLicensePctNum = citySnapshot?.stateStats?.licenseCoveragePct ?? Number(toPct(licenseCount, base));
+  const stateRegistrationPctNum = citySnapshot?.stateStats?.registrationCoveragePct ?? Number(toPct(registrationCount, base));
   const cityCoveragePctOfState = Number(toPct(companies.length, stateBase));
   const cityOshaPctNum = Number(oshaPct);
   const cityLicensePctNum = Number(licensePct);
