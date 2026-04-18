@@ -18,6 +18,7 @@
     "backfill:ca:osha:names": "node D:\\gongsihegui\\scripts\\backfill_osha_company_names.mjs",
     "backfill:ca:osha:names:weak": "node D:\\gongsihegui\\scripts\\backfill_osha_company_names_weak.mjs",
     "backfill:ca:osha:names:strict": "node D:\\gongsihegui\\scripts\\backfill_osha_company_names_strict.mjs",
+    "backfill:tx:companies:from-osha": "cross-env BACKFILL_STATE_CODE=TX node D:\\gongsihegui\\scripts\\backfill_state_companies_from_osha.mjs",
     "verify:ca:data": "node D:\\gongsihegui\\scripts\\verify_california_data.mjs",
     "release:sitemap:cities:ca": "node D:\\gongsihegui\\scripts\\release_city_sitemap_batch.mjs --state=california --batch=2",
     "release:cities:ca:daily": "powershell -ExecutionPolicy Bypass -File D:\\gongsihegui\\scripts\\release_two_cities_daily.ps1",

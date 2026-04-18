@@ -366,11 +366,16 @@ async function main() {
             [companyNames]
           ),
           pool.query<{
-            slug: string; company_name: string; state: string; city: string | null; updated_at: string | null;
+            snapshot_slug: string; company_name: string; state: string; city: string | null; updated_at: string | null;
           }>(
-            `SELECT slug, company_name, state, city, updated_at::text
-             FROM company_pages
-             WHERE slug = ANY($1::text[])`,
+            `SELECT
+               replace(regexp_replace(cp.slug, '^/?company/', ''), '\\', '') AS snapshot_slug,
+               cp.company_name,
+               cp.state,
+               cp.city,
+               cp.updated_at::text
+             FROM company_pages cp
+             WHERE replace(regexp_replace(cp.slug, '^/?company/', ''), '\\', '') = ANY($1::text[])`,
             [companySlugs]
           ),
         ]);
@@ -379,7 +384,13 @@ async function main() {
         const oshaByNorm    = new Map<string, typeof oshaRes.rows>();
         const licenseByNorm = new Map<string, typeof licenseRes.rows>();
         const regByNorm     = new Map<string, typeof regRes.rows>();
-        const detailBySlug  = new Map<string, typeof detailRes.rows[number]>();
+        const detailBySlug  = new Map<string, {
+          slug: string;
+          company_name: string;
+          state: string;
+          city: string | null;
+          updated_at: string | null;
+        }>();
 
         for (const r of oshaRes.rows) {
           if (!oshaByNorm.has(r.normalized_name)) oshaByNorm.set(r.normalized_name, []);
@@ -394,7 +405,13 @@ async function main() {
           regByNorm.get(r.normalized_name)!.push(r);
         }
         for (const r of detailRes.rows) {
-          detailBySlug.set(r.slug, r);
+          detailBySlug.set(r.snapshot_slug, {
+            slug: r.snapshot_slug,
+            company_name: r.company_name,
+            state: r.state,
+            city: r.city,
+            updated_at: r.updated_at,
+          });
         }
 
         // ④ 为这批公司写 JSON 文件
