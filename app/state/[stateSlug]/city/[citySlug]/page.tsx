@@ -212,7 +212,16 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   const stateCode = stateCodeOf(stateName);
   const cityName = targetCitySlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   const citySnapshot = await fetchCitySnapshot(stateSlug, targetCitySlug);
-  const thinCityCount = citySnapshot?.cityCompanyCount ?? citySnapshot?.companies?.length ?? 0;
+  let thinCityCount = citySnapshot?.cityCompanyCount ?? citySnapshot?.companies?.length ?? 0;
+
+  // 快照缺失时，metadata 也应与页面主体一致走 DB 兜底，避免“有内容页面却被 noindex”。
+  if (!thinCityCount && shouldAllowCityDbFallback()) {
+    const dbRows = await safeDbCityCall(
+      () => getCityCompanyPagesWithCategory(stateSlug, targetCitySlug, 21),
+      [] as StateCompanyCategoryRow[]
+    );
+    thinCityCount = dbRows.length;
+  }
   return {
     title: { absolute: `Contractor License Lookup in ${cityName}, ${stateCode} (2026) + OSHA Violations Check` },
     description: `${cityName} ${stateCode} contractor license lookup and OSHA violations check. Compare company risk signals, license status, and shortlist vendors to review first.`,

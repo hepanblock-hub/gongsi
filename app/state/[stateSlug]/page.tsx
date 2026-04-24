@@ -211,6 +211,7 @@ export default async function StatePage({
   const cityGroups = Array.from(cityMap.entries())
     .map(([name, items]) => ({ name, items }))
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name));
+  const indexableCityCounts = cityCounts.filter((row) => row.company_count >= 20);
   const topCityTotal = cityCounts.slice(0, 30).reduce((acc, row) => acc + row.company_count, 0);
 
   const categoryCount = snapshot?.stats?.categoryCount
@@ -456,10 +457,10 @@ export default async function StatePage({
       <SectionCard title="Top cities">
         <p>Top cities by indexed company count in {summary.state} (showing top 30):</p>
         <p>
-          {cityCounts.slice(0, 30).map((g, idx) => (
+          {indexableCityCounts.slice(0, 30).map((g, idx) => (
             <span key={g.city}>
               <a href={`${canonicalCityPath(stateSlug, citySlug(g.city))}#company-list`}>{g.city}</a> ({g.company_count})
-              {idx < Math.min(cityCounts.length, 30) - 1 ? ' · ' : ''}
+              {idx < Math.min(indexableCityCounts.length, 30) - 1 ? ' · ' : ''}
             </span>
           ))}
           {' · '}<a href={`/state/${stateSlug}/cities`}>more</a>
@@ -506,7 +507,9 @@ export default async function StatePage({
                   {profileLabel(categoryOfCompany(c))}
                 </li>
               ))}
-              <li><a href={`${canonicalCityPath(stateSlug, citySlug(g.name))}#company-list`}>View all companies in {g.name} →</a></li>
+              {g.items.length >= 20
+                ? <li><a href={`${canonicalCityPath(stateSlug, citySlug(g.name))}#company-list`}>View all companies in {g.name} →</a></li>
+                : null}
             </ul>
           </details>
         ))}

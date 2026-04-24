@@ -341,32 +341,56 @@ export async function getCompanyTimeline(companyName: string, state: string, lim
   });
 }
 
-export async function getRelatedCompanies(companyName: string, state: string, city?: string | null, limit = 6, currentSlug?: string): Promise<CompanyPageRow[]> {
+export async function getRelatedCompanies(companyName: string, state: string, city?: string | null, limit = 10, currentSlug?: string): Promise<CompanyPageRow[]> {
   const releaseVersion = await getReleaseVisibilityVersion();
   return queryWithSnapshot('query_getRelatedCompanies', { companyName, state, city: city ?? null, limit, currentSlug: currentSlug ?? null, releaseVersion, queryVersion: RELEASE_QUERY_VERSION }, async () => {
-    const { rows } = await pool.query<CompanyPageRow>(
+    const primary = await pool.query<CompanyPageRow>(
       `SELECT slug, company_name, state, city, updated_at::text
      FROM company_pages
-     WHERE lower(state) = lower($1)
-       AND company_name ~* '[A-Za-z]'
+     WHERE company_name ~* '[A-Za-z]'
        AND lower(trim(company_name)) <> '- select -'
-       AND ($5::text IS NULL OR slug <> $5)
+       AND ($3::text IS NULL OR slug <> $3)
        AND (
-         $3::text IS NULL
-         OR lower(coalesce(city, '')) = lower($3)
-         OR company_name ILIKE split_part($2, ' ', 1) || '%'
+         normalize_company_name(company_name) = normalize_company_name($1)
+         OR lower(split_part(company_name, ' ', 1)) = lower(split_part($1, ' ', 1))
        )
-     ORDER BY updated_at DESC NULLS LAST, company_name ASC
-       LIMIT $4`,
-      [state, companyName, city ?? null, Math.max(limit * 5, 24), currentSlug ?? null]
+     ORDER BY
+       CASE
+         WHEN normalize_company_name(company_name) = normalize_company_name($1) THEN 0
+         WHEN lower(split_part(company_name, ' ', 1)) = lower(split_part($1, ' ', 1)) THEN 1
+         ELSE 2
+       END,
+       updated_at DESC NULLS LAST,
+       company_name ASC
+       LIMIT $2`,
+      [companyName, Math.max(limit * 8, 48), currentSlug ?? null]
     );
 
-    const normalizedRows = rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
-    const stateControlMap = await buildStateControlMap(normalizedRows.map((row) => row.state));
+    const normalizeAndFilter = async (rows: CompanyPageRow[]) => {
+      const normalizedRows = rows.map((row) => ({ ...row, city: sanitizeCity(row.city) }));
+      const stateControlMap = await buildStateControlMap(normalizedRows.map((row) => row.state));
+      return normalizedRows.filter((row) => isRowReleased(stateControlMap, row.state, row.city));
+    };
 
-    return normalizedRows
-      .filter((row) => isRowReleased(stateControlMap, row.state, row.city))
-      .slice(0, limit);
+    let filtered = await normalizeAndFilter(primary.rows);
+
+    // 主匹配为空时，回退到同州最近更新列表，避免 Related companies 空白。
+    if (!filtered.length) {
+      const fallback = await pool.query<CompanyPageRow>(
+        `SELECT slug, company_name, state, city, updated_at::text
+         FROM company_pages
+         WHERE lower(state) = lower($1)
+           AND company_name ~* '[A-Za-z]'
+           AND lower(trim(company_name)) <> '- select -'
+           AND ($2::text IS NULL OR slug <> $2)
+         ORDER BY updated_at DESC NULLS LAST, company_name ASC
+         LIMIT $3`,
+        [state, currentSlug ?? null, Math.max(limit * 8, 48)]
+      );
+      filtered = await normalizeAndFilter(fallback.rows);
+    }
+
+    return filtered.slice(0, limit);
   });
 }
 

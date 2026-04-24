@@ -105,12 +105,27 @@ function localNorm(name: string): string {
     .trim();
 }
 
+function firstToken(norm: string): string {
+  return norm.split(' ').filter(Boolean)[0] ?? '';
+}
+
 function toCanonicalState(raw: string): string {
   const s = String(raw ?? '').trim().toLowerCase().replace(/\s+/g, '-');
   if (s === 'texas' || s === 'tx') return 'tx';
   if (s === 'florida' || s === 'fl') return 'fl';
   if (s === 'california' || s === 'ca') return 'ca';
+  if (s === 'new-york' || s === 'new york' || s === 'ny') return 'ny';
   return s;
+}
+
+function toStateSlugForPath(raw: string): string {
+  return String(raw ?? '').trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+function toCitySlugForPath(raw: string | null): string | null {
+  if (!raw) return null;
+  const s = String(raw).trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  return s || null;
 }
 
 // ─── 分阶段开关 ──────────────────────────────────────────────────────────────
@@ -172,6 +187,7 @@ async function main() {
     california: ['california', 'ca'],
     florida: ['florida', 'fl'],
     texas: ['texas', 'tx'],
+    'new-york': ['new-york', 'new york', 'ny'],
   };
   
   for (const state of SNAPSHOT_STATES) {
@@ -208,6 +224,129 @@ async function main() {
   if (!SKIP_COMPANY_PHASE) {
     console.log(`\n[2/4] 公司快照（wangzhan 批量模式）…`);
     console.log(`  批次并发: ${BATCH_CONCURRENCY}`);
+
+    // 预计算：Related companies（同名优先，不足10条时补相似名）
+    type RelatedRow = {
+      slug: string;
+      company_name: string;
+      state: string;
+      city: string | null;
+      updated_at: string | null;
+      norm: string;
+      token: string;
+    };
+
+    const exactRelatedMap = new Map<string, RelatedRow[]>();
+    const tokenRelatedMap = new Map<string, RelatedRow[]>();
+
+    console.log('  预计算 related candidates …');
+    const { rows: relatedUniverse } = await pool.query<{
+      slug: string;
+      company_name: string;
+      state: string;
+      city: string | null;
+      updated_at: string | null;
+    }>(
+      `SELECT slug, company_name, state, city, updated_at::text
+       FROM company_pages
+       WHERE company_name ~* '[A-Za-z]'
+         AND lower(trim(company_name)) <> '- select -'`
+    );
+
+    for (const r of relatedUniverse) {
+      const slug = normalizeCompanySlug(r.slug);
+      const norm = localNorm(r.company_name || '');
+      if (!slug || !norm) continue;
+      const token = firstToken(norm);
+      const row: RelatedRow = {
+        slug,
+        company_name: r.company_name,
+        state: r.state,
+        city: r.city,
+        updated_at: r.updated_at,
+        norm,
+        token,
+      };
+
+      if (!exactRelatedMap.has(norm)) exactRelatedMap.set(norm, []);
+      exactRelatedMap.get(norm)!.push(row);
+
+      if (token) {
+        if (!tokenRelatedMap.has(token)) tokenRelatedMap.set(token, []);
+        tokenRelatedMap.get(token)!.push(row);
+      }
+    }
+
+    const byUpdatedDesc = (a: RelatedRow, b: RelatedRow) => {
+      const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      if (tb !== ta) return tb - ta;
+      return a.company_name.localeCompare(b.company_name);
+    };
+
+    for (const arr of exactRelatedMap.values()) arr.sort(byUpdatedDesc);
+    for (const arr of tokenRelatedMap.values()) arr.sort(byUpdatedDesc);
+
+    const buildRelated = (slug: string, companyName: string, max = 10) => {
+      const norm = localNorm(companyName || '');
+      const token = firstToken(norm);
+      const out: Array<{
+        slug: string;
+        company_name: string;
+        state: string;
+        city: string | null;
+        updated_at: string | null;
+        state_slug: string;
+        city_slug: string | null;
+        state_path: string;
+        city_path: string | null;
+      }> = [];
+      const seen = new Set<string>([slug]);
+
+      const exact = exactRelatedMap.get(norm) ?? [];
+      for (const r of exact) {
+        if (seen.has(r.slug)) continue;
+        seen.add(r.slug);
+        const stateSlug = toStateSlugForPath(r.state);
+        const citySlug = toCitySlugForPath(r.city);
+        out.push({
+          slug: r.slug,
+          company_name: r.company_name,
+          state: r.state,
+          city: r.city,
+          updated_at: r.updated_at,
+          state_slug: stateSlug,
+          city_slug: citySlug,
+          state_path: `/state/${stateSlug}`,
+          city_path: citySlug ? `/state/${stateSlug}/city/${citySlug}` : null,
+        });
+        if (out.length >= max) return out;
+      }
+
+      // 同名不足时，用“同首词”补齐相似公司
+      const similar = token ? (tokenRelatedMap.get(token) ?? []) : [];
+      for (const r of similar) {
+        if (seen.has(r.slug)) continue;
+        if (r.norm === norm) continue;
+        seen.add(r.slug);
+        const stateSlug = toStateSlugForPath(r.state);
+        const citySlug = toCitySlugForPath(r.city);
+        out.push({
+          slug: r.slug,
+          company_name: r.company_name,
+          state: r.state,
+          city: r.city,
+          updated_at: r.updated_at,
+          state_slug: stateSlug,
+          city_slug: citySlug,
+          state_path: `/state/${stateSlug}`,
+          city_path: citySlug ? `/state/${stateSlug}/city/${citySlug}` : null,
+        });
+        if (out.length >= max) break;
+      }
+
+      return out;
+    };
 
     // 预计算：按州一次性生成 city benchmark（避免每批重算）
     const benchmarkByStateCity = new Map<string, { avgOshaRecords: number; activeLicensePct: number; cityCompanyCount: number }>();
@@ -465,7 +604,7 @@ async function main() {
             licenses:      licKey     ? (licenseByNorm.get(licKey)  ?? []) : [],
             registrations: regKey     ? (regByNorm.get(regKey)      ?? []) : [],
             timeline:      null,
-            related:       null,
+            related:       buildRelated(slug, name, 10),
             location:      locationText,
             benchmark,
           });

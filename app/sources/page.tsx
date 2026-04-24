@@ -52,7 +52,7 @@ export default function SourcesPage() {
         </SectionCard>
       </section>
 
-      <SectionCard title="State source links (California, Texas, Florida)">
+      <SectionCard title="State source links (California, Texas, Florida, New York)">
         <p>Official state-level sources used for contractor license and business registration verification:</p>
         <ul>
           <li>
@@ -79,6 +79,24 @@ export default function SourcesPage() {
             {' '}·{' '}
             <a href="https://www.myfloridalicense.com/wl11.asp?mode=0&SID=" target="_blank" rel="dofollow noopener noreferrer">
               Florida DBPR License Lookup
+            </a>
+          </li>
+          <li>
+            <strong>New York:</strong>{' '}
+            <a href="https://data.cityofnewyork.us/resource/ipu4-2q9a.json" target="_blank" rel="dofollow noopener noreferrer">
+              NYC DOB Permit Issuance (raw API)
+            </a>
+            {' '}·{' '}
+            <a href="https://data.ny.gov/resource/ucu3-8265.json" target="_blank" rel="dofollow noopener noreferrer">
+              NY DOS Appearance & Barber Licenses (raw API)
+            </a>
+            {' '}·{' '}
+            <a href="https://data.ny.gov/resource/q35v-e8qb.json" target="_blank" rel="dofollow noopener noreferrer">
+              NY DOS Manufactured Housing Certified Entities (raw API)
+            </a>
+            {' '}·{' '}
+            <a href="https://www.osha.gov/data" target="_blank" rel="dofollow noopener noreferrer">
+              New York OSHA source portal
             </a>
           </li>
         </ul>

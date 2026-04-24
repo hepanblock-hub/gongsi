@@ -139,6 +139,7 @@ const STATE_SLUG_TO_CODES: Record<string, string[]> = {
   california: ['ca', 'california'],
   florida: ['fl', 'florida'],
   texas: ['tx', 'texas'],
+  'new-york': ['ny', 'new york', 'new-york'],
 };
 
 function getStateCodes(stateSlug: string): string[] {

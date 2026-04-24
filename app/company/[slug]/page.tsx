@@ -10,6 +10,7 @@ import FaqJsonLd from '../../../components/seo/FaqJsonLd';
 import JsonLd from '../../../components/seo/JsonLd';
 import { canonicalFilterPath } from '../../../lib/indexing';
 import {
+  getCityCompanyPagesWithCategory,
   getCityComplianceBenchmark,
   getCompanyDetailedLocation,
   getCompanyBySlug,
@@ -401,7 +402,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         'company timeline/related',
         () => Promise.all([
           getCompanyTimeline(page.company_name, page.state, 12),
-          getRelatedCompanies(page.company_name, page.state, page.city, 6, page.slug),
+          getRelatedCompanies(page.company_name, page.state, page.city, 10, page.slug),
         ]),
         [[], []]
       )
@@ -422,6 +423,22 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         [null, null]
       )
     : [null, null];
+
+  const stateSlugForLinks = normalizeStateSlug(page.state);
+  const citySlugForLinks = page.city ? toCitySlug(page.city) : null;
+  const cityPageCompanyCount = (page.city && allowDbFallback)
+    ? await safeDbCall(
+        'city link count',
+        async () => {
+          const rows = await getCityCompanyPagesWithCategory(stateSlugForLinks, citySlugForLinks as string, 21);
+          return rows.length;
+        },
+        0
+      )
+    : 0;
+  const cityPageHref = page.city && citySlugForLinks && cityPageCompanyCount >= 20
+    ? `/state/${stateSlugForLinks}/city/${citySlugForLinks}`
+    : null;
 
   const latestInspection = osha[0]?.inspection_date ?? null;
   const latestLicenseStatus = licenses[0]?.status ?? 'unknown';
@@ -525,7 +542,11 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
       : sameIndustry
         ? `Similar industry (${industryTag})`
         : 'Same state and nearby profile';
-    return { ...c, reason };
+    const stateSlug = (c as { state_slug?: string }).state_slug ?? normalizeStateSlug(c.state);
+    const citySlug = (c as { city_slug?: string | null }).city_slug ?? (c.city ? toCitySlug(c.city) : null);
+    const statePath = (c as { state_path?: string }).state_path ?? `/state/${stateSlug}`;
+    const cityPath = (c as { city_path?: string | null }).city_path ?? (citySlug ? `/state/${stateSlug}/city/${citySlug}` : null);
+    return { ...c, reason, statePath, cityPath };
   });
 
   const companyUrl = `${SITE_URL}${page.slug}`;
@@ -954,9 +975,9 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
 
           <SectionCard title="Explore related index views">
             <p>
-              <a href={`/state/${normalizeStateSlug(page.state)}`}>State overview</a>
+              <a href={`/state/${stateSlugForLinks}`}>State overview</a>
               {page.city ? ` · ` : ''}
-              {page.city ? <a href={`/state/${normalizeStateSlug(page.state)}/city/${toCitySlug(page.city)}`}>City screening page</a> : null}
+              {cityPageHref ? <a href={cityPageHref}>City screening page</a> : null}
               {' '}· <a href={canonicalFilterPath(normalizeStateSlug(page.state), 'quality')}>Quality ranking</a>
               {' '}· <a href={canonicalFilterPath(normalizeStateSlug(page.state), 'active-licenses')}>Active licenses</a>
               {' '}· <a href={canonicalFilterPath(normalizeStateSlug(page.state), 'osha-violations')}>OSHA records</a>
@@ -972,17 +993,23 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
           </SectionCard>
 
           <SectionCard title="Related companies">
-            <ul>
-              {relatedWithReason.map((c) => (
-                <li key={c.slug}>
-                  <a href={companyPathFromSlug(c.slug)}>{c.company_name}</a>
-                  {' '}· <span className="muted">{c.reason}</span>
-                </li>
-              ))}
-            </ul>
+            {relatedWithReason.length > 0 ? (
+              <ul>
+                {relatedWithReason.map((c) => (
+                  <li key={c.slug}>
+                    <a href={companyPathFromSlug(c.slug)}>{c.company_name}</a>
+                    {c.cityPath ? <> · <a href={c.cityPath}>{c.city}</a></> : null}
+                    {' '}· <a href={c.statePath}>{fullStateName(c.state)}</a>
+                    {' '}· <span className="muted">{c.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">No related companies were found in the current released dataset.</p>
+            )}
             <p>
-              <a href={`/state/${normalizeStateSlug(page.state)}`}>State page</a> ·{' '}
-              {page.city ? <a href={`/state/${normalizeStateSlug(page.state)}/city/${toCitySlug(page.city)}`}>City page</a> : null}
+              <a href={`/state/${stateSlugForLinks}`}>State page</a> ·{' '}
+              {cityPageHref ? <a href={cityPageHref}>City page</a> : null}
             </p>
           </SectionCard>
 

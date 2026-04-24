@@ -65,6 +65,10 @@ export interface CompanySnapshot {
     state: string;
     city: string | null;
     updated_at: string | null;
+    state_slug?: string;
+    city_slug?: string | null;
+    state_path?: string;
+    city_path?: string | null;
   }> | null;
   location: string | null;
   benchmark: {

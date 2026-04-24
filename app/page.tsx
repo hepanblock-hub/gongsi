@@ -34,9 +34,10 @@ export default async function HomePage() {
   } catch {
     rows = [];
   }
-  const popularStates = ['california', 'texas', 'florida'];
+  const popularStates = ['california', 'new-york', 'texas', 'florida'];
   const stateSeoText: Record<string, string> = {
     california: 'California contractor license and OSHA records lookup',
+    'new-york': 'New York contractor license and OSHA records lookup',
     texas: 'Texas contractor license and OSHA records lookup',
     florida: 'Florida contractor license and OSHA records lookup',
   };
@@ -148,6 +149,7 @@ export default async function HomePage() {
           </p>
           <p>
             Start here: <a href="/state/california/filter/license-only">California contractor license lookup</a> ·{' '}
+            <a href="/state/new-york/filter/license-only">New York contractor license lookup</a> ·{' '}
             <a href="/state/texas/filter/license-only">Texas contractor license lookup</a>
           </p>
         </SectionCard>
@@ -233,8 +235,9 @@ export default async function HomePage() {
           </ul>
           <p>
             High-intent shortcuts: <a href="/state/california">California contractor license lookup</a> ·{' '}
+            <a href="/state/new-york">New York contractor license lookup</a> ·{' '}
             <a href="/state/florida">Florida contractor license lookup</a> ·{' '}
-            <a href="/state/california/filter/osha">OSHA violations by company</a>
+            <a href="/state/new-york/filter/osha">New York OSHA violations by company</a>
           </p>
         </SectionCard>
       </section>

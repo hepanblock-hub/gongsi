@@ -46,7 +46,10 @@ export default function AboutPage() {
           <li>
             <strong>State licensing board examples:</strong>{' '}
             <a href="https://www.cslb.ca.gov/OnlineServices/CheckLicenseII/CheckLicense.aspx" target="_blank" rel="dofollow noopener noreferrer">California CSLB</a>,{' '}
-            <a href="https://www.myfloridalicense.com/wl11.asp?mode=0&SID=" target="_blank" rel="dofollow noopener noreferrer">Florida DBPR</a>
+            <a href="https://www.myfloridalicense.com/wl11.asp?mode=0&SID=" target="_blank" rel="dofollow noopener noreferrer">Florida DBPR</a>,{' '}
+            <a href="https://data.ny.gov/resource/ucu3-8265.json" target="_blank" rel="dofollow noopener noreferrer">New York DOS (Appearance & Barber)</a>,{' '}
+            <a href="https://data.ny.gov/resource/q35v-e8qb.json" target="_blank" rel="dofollow noopener noreferrer">New York DOS (Manufactured Housing)</a>,{' '}
+            <a href="https://data.cityofnewyork.us/resource/ipu4-2q9a.json" target="_blank" rel="dofollow noopener noreferrer">NYC DOB Permit Issuance</a>
           </li>
         </ul>
         <p>See <a href="/sources">Sources</a> for full details.</p>
