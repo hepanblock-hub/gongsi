@@ -21,7 +21,7 @@ import {
   getRelatedCompanies,
   getRegistrationsByCompany,
 } from '../../../lib/queries';
-import { companyPathFromSlug, formatDate, formatMoney, normalizeStateSlug, SITE_URL } from '../../../lib/site';
+import { companyPathFromSlug, formatDate, formatMoney, normalizeStateSlug, stateToFullSlug, SITE_URL } from '../../../lib/site';
 import { fetchCompanySnapshot } from '../../../lib/companySnapshot';
 
 export const revalidate = 86400;
@@ -542,10 +542,10 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
       : sameIndustry
         ? `Similar industry (${industryTag})`
         : 'Same state and nearby profile';
-    const stateSlug = (c as { state_slug?: string }).state_slug ?? normalizeStateSlug(c.state);
+    const stateSlug = stateToFullSlug(c.state ?? '');
     const citySlug = (c as { city_slug?: string | null }).city_slug ?? (c.city ? toCitySlug(c.city) : null);
-    const statePath = (c as { state_path?: string }).state_path ?? `/state/${stateSlug}`;
-    const cityPath = (c as { city_path?: string | null }).city_path ?? (citySlug ? `/state/${stateSlug}/city/${citySlug}` : null);
+    const statePath = `/state/${stateSlug}`;
+    const cityPath = citySlug ? `/state/${stateSlug}/city/${citySlug}` : null;
     return { ...c, reason, statePath, cityPath };
   });
 

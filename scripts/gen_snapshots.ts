@@ -118,8 +118,26 @@ function toCanonicalState(raw: string): string {
   return s;
 }
 
+const STATE_CODE_TO_FULL_SLUG: Record<string, string> = {
+  AL: 'alabama', AK: 'alaska', AZ: 'arizona', AR: 'arkansas', CA: 'california',
+  CO: 'colorado', CT: 'connecticut', DE: 'delaware', FL: 'florida', GA: 'georgia',
+  HI: 'hawaii', ID: 'idaho', IL: 'illinois', IN: 'indiana', IA: 'iowa',
+  KS: 'kansas', KY: 'kentucky', LA: 'louisiana', ME: 'maine', MD: 'maryland',
+  MA: 'massachusetts', MI: 'michigan', MN: 'minnesota', MS: 'mississippi', MO: 'missouri',
+  MT: 'montana', NE: 'nebraska', NV: 'nevada', NH: 'new-hampshire', NJ: 'new-jersey',
+  NM: 'new-mexico', NY: 'new-york', NC: 'north-carolina', ND: 'north-dakota', OH: 'ohio',
+  OK: 'oklahoma', OR: 'oregon', PA: 'pennsylvania', RI: 'rhode-island', SC: 'south-carolina',
+  SD: 'south-dakota', TN: 'tennessee', TX: 'texas', UT: 'utah', VT: 'vermont',
+  VA: 'virginia', WA: 'washington', WV: 'west-virginia', WI: 'wisconsin', WY: 'wyoming',
+};
+
 function toStateSlugForPath(raw: string): string {
-  return String(raw ?? '').trim().toLowerCase().replace(/\s+/g, '-');
+  const trimmed = String(raw ?? '').trim();
+  const upper = trimmed.toUpperCase();
+  if (upper.length === 2 && STATE_CODE_TO_FULL_SLUG[upper]) {
+    return STATE_CODE_TO_FULL_SLUG[upper];
+  }
+  return trimmed.toLowerCase().replace(/\s+/g, '-');
 }
 
 function toCitySlugForPath(raw: string | null): string | null {
