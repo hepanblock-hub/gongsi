@@ -46,6 +46,7 @@ export const PRIMARY_FILTER_SLUGS: PrimaryFilterSlug[] = [
 export const STATIC_INDEXABLE_PAGES = [
   '/',
   '/about',
+  '/contact',
   '/editorial-policy',
   '/faq',
   '/methodology',

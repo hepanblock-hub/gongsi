@@ -19,9 +19,10 @@ export default function Footer() {
         <div className="footer-links" aria-label="Footer links">
           <a href="/sitemap-index.xml">Sitemap</a>
           <a href="/about">About</a>
+          <a href="/contact">Contact</a>
           <a href="/sources">Sources</a>
           <a href="/methodology">Methodology</a>
-          <a href="/faq">Corrections</a>
+          <a href="/contact">Corrections</a>
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
           <a href="/faq">FAQ</a>

@@ -40,6 +40,7 @@ export default async function Header() {
             <li><a href="/state/california/filter/license-only">Licenses</a></li>
             <li><a href="/sources">Sources</a></li>
             <li><a href="/methodology">Methodology</a></li>
+            <li><a href="/contact">Contact</a></li>
           </ul>
         </nav>
 

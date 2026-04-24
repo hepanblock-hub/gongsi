@@ -9,6 +9,7 @@ export default function MobileNav() {
         <a href="/state/california/filter/license-only">Licenses</a>
         <a href="/sources">Sources</a>
         <a href="/methodology">Methodology</a>
+        <a href="/contact">Contact</a>
         <a href="/faq">FAQ</a>
       </div>
     </details>
