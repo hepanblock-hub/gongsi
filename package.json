@@ -36,6 +36,8 @@
     "gen:snapshots:full": "cross-env SNAPSHOT_STATE=california,florida,texas npx tsx scripts/gen_snapshots.ts && cross-env SNAPSHOT_STATE=california,florida,texas npx tsx scripts/gen_city_filter_snapshots.ts",
     "gen:snapshots:structured": "node D:\\gongsihegui\\scripts\\build_structured_snapshots.mjs",
     "gen:snapshots:fullrender": "node D:\\gongsihegui\\scripts\\build_full_render_snapshots.mjs",
+    "fix:snapshots:related:scan": "npx tsx scripts/fix_related_snapshot_anomalies.ts",
+    "fix:snapshots:related:delete": "cross-env FIX_RELATED_DELETE=true npx tsx scripts/fix_related_snapshot_anomalies.ts",
     "upload:snapshots": "npx tsx scripts/upload-snapshots.ts",
     "upload:snapshots:all": "cross-env SNAPSHOT_UPLOAD_SUBDIRS=company,state,city,filter,root npx tsx scripts/upload-snapshots.ts",
     "upload:snapshots:force": "cross-env SNAPSHOT_UPLOAD_UPSERT=true SNAPSHOT_UPLOAD_SUBDIRS=company,state,city,filter,root npx tsx scripts/upload-snapshots.ts",
