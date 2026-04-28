@@ -1,5 +1,6 @@
 import { absoluteUrl, canonicalCityPath, canonicalFilterPath, chunkArray, PRIMARY_FILTER_SLUGS, STATIC_INDEXABLE_PAGES, xmlEscape } from '../../../lib/indexing';
 import { countIndexableCompanies, getCompanySitemapBatch, getIndexedStateCitiesMap, getIndexedStates } from '../../../lib/queries';
+import { companyPathFromSlug } from '../../../lib/site';
 
 const CITY_CHUNK_SIZE = 5000;
 const FILTER_CHUNK_SIZE = 5000;
@@ -84,7 +85,7 @@ export async function GET(
 
     const rows = await getCompanySitemapBatch(chunkIndex * COMPANY_CHUNK_SIZE, COMPANY_CHUNK_SIZE);
     const entries = rows.map((row) => ({
-      loc: absoluteUrl(row.slug),
+      loc: absoluteUrl(companyPathFromSlug(row.slug)),
       lastmod: row.updated_at ? new Date(row.updated_at).toISOString() : undefined,
     }));
     return xml(buildUrlset(entries));

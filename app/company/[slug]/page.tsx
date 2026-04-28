@@ -353,7 +353,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description,
     robots: { index: true, follow: true },
     alternates: {
-      canonical: page.slug,
+      canonical: companyPathFromSlug(page.slug),
     },
     authors: [{ name: 'Compliance Lookup Editorial Team' }],
     creator: 'Compliance Lookup Data Team',
