@@ -1,12 +1,19 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import Breadcrumbs from '../../../../components/common/Breadcrumbs';
 import PageTitle from '../../../../components/common/PageTitle';
 import SectionCard from '../../../../components/common/SectionCard';
 import { getStateCityCounts } from '../../../../lib/queries';
 import { hasReleasedCityControl } from '../../../../lib/release';
 import { stateSlugToName } from '../../../../lib/site';
+import { fetchStateSnapshot } from '../../../../lib/stateSnapshot';
 
 export const dynamic = 'force-dynamic';
+
+function shouldAllowStateDbFallback(): boolean {
+  const raw = (process.env.STATE_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase();
+  return ['true', '1', 'yes', 'on'].includes(raw);
+}
 
 function citySlug(value: string): string {
   return value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -36,8 +43,12 @@ export default async function StateCitiesPage({
   const { stateSlug } = await params;
   const stateName = stateSlugToName(stateSlug);
   const releasedOnly = await hasReleasedCityControl(stateSlug);
+  const snapshot = await fetchStateSnapshot(stateSlug);
+  const allowDbFallback = shouldAllowStateDbFallback();
 
-  const allCities = await getStateCityCounts(stateSlug);
+  if (!snapshot && !allowDbFallback) notFound();
+
+  const allCities = snapshot?.cityCounts ?? await getStateCityCounts(stateSlug);
 
   return (
     <main className="container">

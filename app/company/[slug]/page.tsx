@@ -264,16 +264,24 @@ async function safeDbCall<T>(label: string, fn: () => Promise<T>, fallback: T): 
 }
 
 function shouldAllowCompanyDbFallback(): boolean {
-  // 需求：快照优先，但默认允许数据库兜底，避免快照缺失直接 404。
-  // 如需强制禁用 DB 兜底，可显式设置 COMPANY_SNAPSHOT_DB_FALLBACK=false。
+  // 必要兜底：仅用于 routing/detail 这类页面生存必需数据。
+  // 如需强制禁用必要 DB 兜底，可显式设置 COMPANY_SNAPSHOT_DB_FALLBACK=false。
   const raw = (process.env.COMPANY_SNAPSHOT_DB_FALLBACK ?? 'true').toLowerCase();
   return !['false', '0', 'no', 'off'].includes(raw);
+}
+
+function shouldAllowCompanySupplementalDbFallback(): boolean {
+  // 非必要增强数据（records / timeline / related / location / benchmark）默认不查库；
+  // 仅在显式开启时才允许作为补救手段。
+  const raw = (process.env.COMPANY_SNAPSHOT_SUPPLEMENTAL_DB_FALLBACK ?? 'false').toLowerCase();
+  return ['true', '1', 'yes', 'on'].includes(raw);
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const fullSlug = companyPathFromSlug(slug);
   const allowDbFallback = shouldAllowCompanyDbFallback();
+  const allowSupplementalDbFallback = shouldAllowCompanySupplementalDbFallback();
 
   // 快照优先，DB兜底
   const snapshot = await fetchCompanySnapshot(slug);
@@ -292,7 +300,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const stateCode = Object.entries(STATE_CODE_TO_NAME).find(([, v]) => v === stateName)?.[0] ?? stateName;
   const [osha, licenses, registrations] = snapshot
     ? [snapshot.osha ?? [], snapshot.licenses ?? [], snapshot.registrations ?? []]
-    : allowDbFallback
+    : allowDbFallback && allowSupplementalDbFallback
     ? await safeDbCall(
         'company metadata records',
         () => Promise.all([
@@ -365,6 +373,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const fullSlug = companyPathFromSlug(slug);
   const allowDbFallback = shouldAllowCompanyDbFallback();
+  const allowSupplementalDbFallback = shouldAllowCompanySupplementalDbFallback();
 
   // 快照优先，DB兜底
   const snapshot = await fetchCompanySnapshot(slug);
@@ -380,7 +389,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
 
   const [osha, licenses, registrations] = snapshot
     ? [snapshot.osha ?? [], snapshot.licenses ?? [], snapshot.registrations ?? []]
-    : allowDbFallback
+    : allowDbFallback && allowSupplementalDbFallback
     ? await safeDbCall(
         'company page records',
         () => Promise.all([
@@ -397,7 +406,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         snapshot.timeline ?? [],
         snapshot.related ?? [],
       ]
-    : allowDbFallback
+    : allowDbFallback && allowSupplementalDbFallback
     ? await safeDbCall(
         'company timeline/related',
         () => Promise.all([
@@ -413,7 +422,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         snapshot.location ?? null,
         snapshot.benchmark ?? null,
       ]
-    : allowDbFallback
+    : allowDbFallback && allowSupplementalDbFallback
     ? await safeDbCall(
         'company location/benchmark',
         () => Promise.all([
@@ -426,16 +435,17 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
 
   const stateSlugForLinks = normalizeStateSlug(page.state);
   const citySlugForLinks = page.city ? toCitySlug(page.city) : null;
-  const cityPageCompanyCount = (page.city && allowDbFallback)
-    ? await safeDbCall(
-        'city link count',
-        async () => {
-          const rows = await getCityCompanyPagesWithCategory(stateSlugForLinks, citySlugForLinks as string, 21);
-          return rows.length;
-        },
-        0
-      )
-    : 0;
+  const cityPageCompanyCount = snapshot?.benchmark?.cityCompanyCount
+    ?? ((page.city && allowDbFallback && allowSupplementalDbFallback)
+      ? await safeDbCall(
+          'city link count',
+          async () => {
+            const rows = await getCityCompanyPagesWithCategory(stateSlugForLinks, citySlugForLinks as string, 21);
+            return rows.length;
+          },
+          0
+        )
+      : 0);
   const cityPageHref = page.city && citySlugForLinks && cityPageCompanyCount >= 20
     ? `/state/${stateSlugForLinks}/city/${citySlugForLinks}`
     : null;

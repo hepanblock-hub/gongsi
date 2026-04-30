@@ -9,8 +9,8 @@ import { companyPathFromSlug, SITE_URL, stateSlugToName } from '../../../../../l
 import { fetchCitySnapshot } from '../../../../../lib/citySnapshot';
 
 function shouldAllowCityDbFallback(): boolean {
-  const raw = (process.env.CITY_SNAPSHOT_DB_FALLBACK ?? 'true').toLowerCase();
-  return !['false', '0', 'no', 'off'].includes(raw);
+  const raw = (process.env.CITY_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase();
+  return ['true', '1', 'yes', 'on'].includes(raw);
 }
 
 async function safeDbCityCall<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
@@ -212,10 +212,11 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   const stateCode = stateCodeOf(stateName);
   const cityName = targetCitySlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   const citySnapshot = await fetchCitySnapshot(stateSlug, targetCitySlug);
+  const allowDbFallback = shouldAllowCityDbFallback();
   let thinCityCount = citySnapshot?.cityCompanyCount ?? citySnapshot?.companies?.length ?? 0;
 
   // 快照缺失时，metadata 也应与页面主体一致走 DB 兜底，避免“有内容页面却被 noindex”。
-  if (!thinCityCount && shouldAllowCityDbFallback()) {
+  if (!thinCityCount && allowDbFallback) {
     const dbRows = await safeDbCityCall(
       () => getCityCompanyPagesWithCategory(stateSlug, targetCitySlug, 21),
       [] as StateCompanyCategoryRow[]
@@ -237,6 +238,7 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
   const { stateSlug, citySlug: targetCitySlug } = await params;
   const citySnapshot = await fetchCitySnapshot(stateSlug, targetCitySlug);
   const allowDbFallback = shouldAllowCityDbFallback();
+  if (!citySnapshot && !allowDbFallback) notFound();
   const stateName = stateSlugToName(stateSlug);
   const stateCode = stateCodeOf(stateName);
   const officialLinks = officialLinksForState(stateSlug);

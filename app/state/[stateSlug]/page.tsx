@@ -19,6 +19,11 @@ export async function generateStaticParams() {
   return [];
 }
 
+function shouldAllowStateDbFallback(): boolean {
+  const raw = (process.env.STATE_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase();
+  return ['true', '1', 'yes', 'on'].includes(raw);
+}
+
 const STATE_NAME_TO_CODE: Record<string, string> = {
   alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO', connecticut: 'CT',
   delaware: 'DE', florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA',
@@ -174,8 +179,10 @@ export default async function StatePage({
 }) {
   const { stateSlug } = await params;
   const officialLinks = officialLinksForState(stateSlug);
+  const allowDbFallback = shouldAllowStateDbFallback();
 
   const snapshot = await fetchStateSnapshot(stateSlug);
+  if (!snapshot && !allowDbFallback) notFound();
   const summary = snapshot
     ? {
       state: stateSlugToName(stateSlug),

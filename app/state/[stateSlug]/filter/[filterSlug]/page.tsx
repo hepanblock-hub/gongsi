@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Breadcrumbs from '../../../../../components/common/Breadcrumbs';
 import PageTitle from '../../../../../components/common/PageTitle';
 import SectionCard from '../../../../../components/common/SectionCard';
+import { fetchFilterSnapshot } from '../../../../../lib/filterSnapshot';
 import { FILTER_CANONICAL_MAP, canonicalFilterPath, canonicalFilterSlug, isPrimaryFilterSlug, PRIMARY_FILTER_SLUGS } from '../../../../../lib/indexing';
 import { getStateCompanyPagesWithCategory, type StateCompanyCategoryRow } from '../../../../../lib/queries';
 import { companyPathFromSlug, stateSlugToName } from '../../../../../lib/site';
@@ -14,6 +15,11 @@ export const dynamicParams = true;
 export async function generateStaticParams() {
   // 构建期不预渲染筛选页，全部按需 ISR
   return [];
+}
+
+function shouldAllowFilterDbFallback(): boolean {
+  const raw = (process.env.FILTER_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase();
+  return ['true', '1', 'yes', 'on'].includes(raw);
 }
 
 const FILTERS = Object.keys(FILTER_CANONICAL_MAP) as Array<keyof typeof FILTER_CANONICAL_MAP>;
@@ -311,6 +317,7 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
 export default async function StateFilterPage({ params }: { params: Promise<{ stateSlug: string; filterSlug: string }> }) {
   const { stateSlug, filterSlug } = await params;
   const normalizedFilterSlug = canonicalFilterSlug(filterSlug);
+  const allowDbFallback = shouldAllowFilterDbFallback();
   if (!isPrimaryFilterSlug(normalizedFilterSlug)) notFound();
   if (normalizedFilterSlug !== filterSlug) {
     permanentRedirect(canonicalFilterPath(stateSlug, normalizedFilterSlug) as never);
@@ -320,9 +327,8 @@ export default async function StateFilterPage({ params }: { params: Promise<{ st
   const stateCode = stateCodeOf(stateName);
   const officialLinks = officialLinksForState(stateSlug);
   
-  // 优先尝试从快照读取筛选数据
-  const { fetchFilterSnapshot } = await import('../../../../../lib/filterSnapshot');
   const filterSnapshot = await fetchFilterSnapshot(stateSlug, normalizedFilterSlug);
+  if (!filterSnapshot && !allowDbFallback) notFound();
   let companies = filterSnapshot?.companies ?? await getStateCompanyPagesWithCategory(stateSlug, 5000);
 
   if (normalizedFilterSlug === 'full-profiles' || normalizedFilterSlug === 'partial-profiles' || normalizedFilterSlug === 'osha-only' || normalizedFilterSlug === 'license-only' || normalizedFilterSlug === 'registration-only' || normalizedFilterSlug === 'basic-listings') {

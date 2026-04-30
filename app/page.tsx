@@ -22,13 +22,19 @@ export const metadata: Metadata = {
   alternates: { canonical: '/' },
 };
 
+function shouldAllowRootDbFallback(): boolean {
+  const raw = (process.env.ROOT_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase();
+  return ['true', '1', 'yes', 'on'].includes(raw);
+}
+
 export default async function HomePage() {
   let rows = [] as Awaited<ReturnType<typeof getRecentCompanyPages>>;
+  const allowDbFallback = shouldAllowRootDbFallback();
   try {
     const snapshot = await fetchRecentSnapshot();
     if (snapshot?.data?.length) {
       rows = snapshot.data;
-    } else {
+    } else if (allowDbFallback) {
       rows = await getRecentCompanyPages(30);
     }
   } catch {
