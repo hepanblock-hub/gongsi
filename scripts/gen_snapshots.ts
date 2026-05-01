@@ -150,6 +150,7 @@ function toCitySlugForPath(raw: string | null): string | null {
 const SKIP_HOME_PHASE    = (process.env.SNAPSHOT_SKIP_HOME    ?? 'false') === 'true';
 const SKIP_COMPANY_PHASE = (process.env.SNAPSHOT_SKIP_COMPANY ?? 'false') === 'true';
 const SKIP_STATE_PHASE   = (process.env.SNAPSHOT_SKIP_STATE   ?? 'false') === 'true';
+const FORCE_REWRITE_COMPANY = (process.env.SNAPSHOT_FORCE_REWRITE_COMPANY ?? 'false') === 'true';
 const SNAPSHOT_STATE     = (process.env.SNAPSHOT_STATE ?? 'california').toLowerCase();
 const SNAPSHOT_STATES    = SNAPSHOT_STATE.split(',').map(s => s.trim()).filter(Boolean);
 
@@ -449,12 +450,12 @@ async function main() {
       let written = 0;
       let skipped = 0;
 
-      // ① 先检查哪些文件已存在
+      // ① 先检查哪些文件已存在（可通过 FORCE_REWRITE_COMPANY 强制重写）
       const needWrite: typeof batchRows = [];
       for (const row of batchRows) {
         const slug = normalizeCompanySlug(row.slug);
         const outFile = path.join(COMPANY_DIR, `${slug}.json`);
-        if (await fileExists(outFile)) {
+        if (!FORCE_REWRITE_COMPANY && await fileExists(outFile)) {
           skipped++;
         } else {
           needWrite.push(row);
@@ -610,8 +611,16 @@ async function main() {
             ? `${name} operates in ${cityRaw}, ${String(stateRaw).toUpperCase()}.`
             : `${name} operates in ${String(stateRaw).toUpperCase()}.`;
           const benchmark = cityKey
-            ? (benchmarkByStateCity.get(`${stateKey}|${cityKey}`) ?? null)
-            : null;
+            ? (benchmarkByStateCity.get(`${stateKey}|${cityKey}`) ?? {
+              avgOshaRecords: 0,
+              activeLicensePct: 0,
+              cityCompanyCount: 0,
+            })
+            : {
+              avgOshaRecords: 0,
+              activeLicensePct: 0,
+              cityCompanyCount: 0,
+            };
 
           await writeJson(outFile, {
             generatedAt:   new Date().toISOString(),

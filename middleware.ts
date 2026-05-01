@@ -49,6 +49,18 @@ export function middleware(request: NextRequest) {
   const { nextUrl } = request;
   const pathname = nextUrl.pathname;
 
+  // 历史错误重定向自愈：旧逻辑可能把 logo 误重写到 company 路径。
+  if (pathname === '/company/logo-compliance-lookup-svg') {
+    const target = new URL('/logo-compliance-lookup.svg', nextUrl.origin);
+    return NextResponse.redirect(target, 308);
+  }
+
+  // 静态资源（带扩展名）直接放行，避免被误判为历史 company slug。
+  // 例如 /logo-compliance-lookup.svg 不应被重定向到 /company/*。
+  if (/\.[a-z0-9]+$/i.test(pathname)) {
+    return NextResponse.next();
+  }
+
   // 1) 历史公司URL兼容：/foo-bar-ca => /company/foo-bar-ca
   const topLevel = pathname.match(/^\/([^/]+)\/?$/);
   if (topLevel) {

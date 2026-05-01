@@ -224,8 +224,8 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
     thinCityCount = dbRows.length;
   }
   return {
-    title: { absolute: `Contractor License Lookup in ${cityName}, ${stateCode} (2026) + OSHA Violations Check` },
-    description: `${cityName} ${stateCode} contractor license lookup and OSHA violations check. Compare company risk signals, license status, and shortlist vendors to review first.`,
+    title: { absolute: `${cityName}, ${stateCode} Contractor License Lookup & OSHA Violations` },
+    description: `Find ${cityName}, ${stateCode} contractors and companies by OSHA records, license status, and registration signals. Compare risk indicators before hiring.`,
     alternates: { canonical: `/state/${stateSlug}/city/${targetCitySlug}` },
     robots: { index: thinCityCount >= 20, follow: true },
     authors: [{ name: 'Compliance Lookup Editorial Team' }],

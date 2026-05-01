@@ -9,6 +9,37 @@ type SnapshotEnvelope<T> = {
   data: T;
 };
 
+function getQuerySnapshotBaseUrl(): string | null {
+  return (
+    process.env.QUERY_SNAPSHOT_BASE_URL?.replace(/\/$/, '') ??
+    process.env.ROOT_SNAPSHOT_BASE_URL?.replace(/\/$/, '') ??
+    null
+  );
+}
+
+function getSnapshotToken(): string | null {
+  return (
+    process.env.SNAPSHOT_STORAGE_TOKEN ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_ANON_KEY ??
+    null
+  );
+}
+
+function buildSnapshotCandidates(url: string, token: string | null): string[] {
+  if (!token) return [url];
+  if (!url.includes('/storage/v1/object/public/')) return [url];
+  return [url, url.replace('/storage/v1/object/public/', '/storage/v1/object/authenticated/')];
+}
+
+function buildSnapshotHeaders(token: string | null): HeadersInit | undefined {
+  if (!token) return undefined;
+  return {
+    Authorization: `Bearer ${token}`,
+    apikey: token,
+  };
+}
+
 function snapshotRoot(): string {
   return process.env.SNAPSHOT_DATA_ROOT ?? path.join(process.cwd(), 'kuaizhao', 'data');
 }
@@ -37,6 +68,31 @@ async function readSnapshotFile<T>(filePath: string): Promise<T | null> {
   }
 }
 
+async function fetchRemoteSnapshot<T>(relativePath: string): Promise<T | null> {
+  const base = getQuerySnapshotBaseUrl();
+  if (!base) return null;
+
+  const token = getSnapshotToken();
+  const headers = buildSnapshotHeaders(token);
+  const url = `${base}/${relativePath.split('/').map(encodeURIComponent).join('/')}`;
+
+  for (const requestUrl of buildSnapshotCandidates(url, token)) {
+    try {
+      const res = await fetch(requestUrl, {
+        headers,
+        next: { revalidate: 86400 },
+      });
+      if (!res.ok) continue;
+      const parsed = (await res.json()) as SnapshotEnvelope<T>;
+      return parsed?.data ?? null;
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 async function writeSnapshotFile<T>(filePath: string, envelope: SnapshotEnvelope<T>): Promise<void> {
   try {
     await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -59,10 +115,22 @@ export async function queryWithSnapshot<T>(
   const safeNamespace = sanitizeNamespace(namespace);
   const payloadHash = hashPayload(payload);
   const filePath = path.join(root, safeNamespace, `${payloadHash}.json`);
+  const relativePath = `${safeNamespace}/${payloadHash}.json`;
 
   const snapshotFirst = (process.env.SNAPSHOT_PRIORITY ?? 'snapshot').toLowerCase() !== 'database';
 
   if (snapshotFirst) {
+    const remote = await fetchRemoteSnapshot<T>(relativePath);
+    if (remote !== null) {
+      await writeSnapshotFile(filePath, {
+        generatedAt: new Date().toISOString(),
+        namespace,
+        payload,
+        data: remote,
+      });
+      return remote;
+    }
+
     const cached = await readSnapshotFile<T>(filePath);
     if (cached !== null) return cached;
   }

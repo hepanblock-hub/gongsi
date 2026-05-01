@@ -161,8 +161,8 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   const stateCode = stateCodeOf(stateName);
 
   return {
-    title: { absolute: `Contractor License Lookup in ${stateName}, ${stateCode} + OSHA Violations Records (2026)` },
-    description: `State-level contractor lookup and OSHA violations analysis for ${stateName}. Compare risk tiers, city concentration, and company profiles before hiring decisions.`,
+    title: { absolute: `${stateName} Contractor License Lookup & OSHA Violations | Company Compliance` },
+    description: `Search ${stateName} (${stateCode}) contractors and companies by OSHA violations, license status, and registration records. Compare profiles before hiring decisions.`,
     alternates: {
       canonical: `/state/${stateSlug}`,
     },

@@ -68,11 +68,6 @@ function getOshaRecordLabel(violationType: string | null, inspectionType: string
   return 'OSHA summary record';
 }
 
-function pickVariant(seed: string, options: string[]): string {
-  const hash = Array.from(seed).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  return options[hash % options.length];
-}
-
 function fullStateName(state: string): string {
   const code = state.trim().toUpperCase();
   return STATE_CODE_TO_NAME[code] ?? state;
@@ -457,30 +452,18 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
   const freshnessLine = `Data on this page was last updated in ${formatMonthYear(page.updated_at)}.`;
 
   const locationLine = page.city
-    ? pickVariant(`${page.company_name}:location`, [
-      `${page.company_name} is a registered business entity based in ${page.city}, ${stateName}.`,
-      `${page.company_name} is a company headquartered in ${page.city}, ${stateName}.`,
-      `${page.company_name} operates as a business entity in ${page.city}, ${stateName}.`,
-    ])
-    : pickVariant(`${page.company_name}:location`, [
-      `${page.company_name} is a registered business entity based in ${stateName}.`,
-      `${page.company_name} is a company operating in ${stateName}.`,
-      `${page.company_name} is listed as a business entity in ${stateName}.`,
-    ]);
+    ? `${page.company_name} is a business entity based in ${page.city}, ${stateName}. To verify current business status, contact the ${stateName} Secretary of State office directly.`
+    : `${page.company_name} is registered in ${stateName}. To verify current business status, contact the ${stateName} Secretary of State office directly.`;
 
   const oshaLine = osha.length > 0
-    ? `According to publicly available records, the company has ${osha.length} OSHA inspection records, and ${formatInspectionNarrative(osha[0]?.inspection_date ?? null, osha[0]?.severity ?? null)}.`
-    : 'According to publicly available records, OSHA inspection records were not observed in the current dataset.';
+    ? `${page.company_name} has ${osha.length} OSHA inspection record${osha.length > 1 ? 's' : ''} on file. ${formatInspectionNarrative(osha[0]?.inspection_date ?? null, osha[0]?.severity ?? null)}.`
+    : `${page.company_name} has no OSHA inspection records in the current public dataset.`;
 
   const recordsLine = licenses.length === 0 && registrations.length === 0
     ? 'No contractor license or business registration records were observed in the current dataset snapshot.'
     : `Observed records: ${licenses.length} license record${licenses.length > 1 ? 's' : ''} and ${registrations.length} registration record${registrations.length > 1 ? 's' : ''}.`;
 
-  const riskIntro = pickVariant(page.company_name, [
-    'Based on available public records, this company has recorded OSHA inspections, indicating past workplace safety activity.',
-    'Publicly available compliance data shows OSHA inspection activity for this company, indicating prior workplace safety oversight.',
-    'Available government records indicate that this company has OSHA inspection history, reflecting prior workplace safety review.',
-  ]);
+  const riskIntro = `Based on public government records, ${page.company_name} has documented workplace safety activity. Review the compliance signals below to understand ${page.company_name}'s history and make informed hiring or business decisions.`;
 
   const riskFollowUp = licenses.length === 0 && registrations.length === 0
     ? `No confirmed contractor license or business registration record was observed in the current dataset.`

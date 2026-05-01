@@ -24,8 +24,8 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   const stateName = stateSlugToName(stateSlug);
 
   return {
-    title: { absolute: `${stateName} Cities Overview | OSHA, License & Company Records` },
-    description: `Browse cities in ${stateName} with public compliance records. Find OSHA history, contractor license status, and company registration details by city.`,
+    title: { absolute: `Browse ${stateName} Cities | Contractor License & OSHA Records` },
+    description: `Find cities in ${stateName} with contractor license status, OSHA records, and company registration coverage. Start city-level compliance lookup by location.`,
     alternates: {
       canonical: `/state/${stateSlug}/cities`,
     },

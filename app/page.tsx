@@ -17,8 +17,8 @@ function recordTypeLabel(hasOsha: boolean, hasLicense: boolean, hasRegistration:
 }
 
 export const metadata: Metadata = {
-  title: { absolute: 'Compliance Lookup | OSHA, License & Registration Records' },
-  description: 'Search public compliance records for companies and contractors. Browse OSHA inspections, contractor licenses, and registration status from official sources.',
+  title: { absolute: 'Company Compliance Lookup | OSHA Violations, Contractor License & Registration Records' },
+  description: 'Find public OSHA inspection records, contractor license status, and business registration details for companies across US states. Verify compliance history before hiring contractors.',
   alternates: { canonical: '/' },
 };
 
