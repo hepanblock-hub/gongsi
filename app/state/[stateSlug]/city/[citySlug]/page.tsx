@@ -10,7 +10,7 @@ import { fetchCitySnapshot } from '../../../../../lib/citySnapshot';
 import { assessCollectionPageQuality } from '../../../../../lib/pageQuality';
 
 function shouldAllowCityDbFallback(): boolean {
-  const raw = (process.env.CITY_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase();
+  const raw = (process.env.CITY_SNAPSHOT_DB_FALLBACK ?? 'true').toLowerCase();
   return ['true', '1', 'yes', 'on'].includes(raw);
 }
 

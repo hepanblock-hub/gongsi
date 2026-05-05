@@ -11,7 +11,7 @@ import { fetchStateSnapshot } from '../../../../lib/stateSnapshot';
 export const dynamic = 'force-dynamic';
 
 function shouldAllowStateDbFallback(): boolean {
-  const raw = (process.env.STATE_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase();
+  const raw = (process.env.STATE_SNAPSHOT_DB_FALLBACK ?? 'true').toLowerCase();
   return ['true', '1', 'yes', 'on'].includes(raw);
 }
 

@@ -19,7 +19,7 @@ export async function generateStaticParams() {
 }
 
 function shouldAllowFilterDbFallback(): boolean {
-  const raw = (process.env.FILTER_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase();
+  const raw = (process.env.FILTER_SNAPSHOT_DB_FALLBACK ?? 'true').toLowerCase();
   return ['true', '1', 'yes', 'on'].includes(raw);
 }
 

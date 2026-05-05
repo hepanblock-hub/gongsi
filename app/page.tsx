@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 function shouldAllowRootDbFallback(): boolean {
-  const raw = (process.env.ROOT_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase();
+  const raw = (process.env.ROOT_SNAPSHOT_DB_FALLBACK ?? 'true').toLowerCase();
   return ['true', '1', 'yes', 'on'].includes(raw);
 }
 
@@ -38,7 +38,15 @@ export default async function HomePage() {
       rows = await getRecentCompanyPages(30);
     }
   } catch {
-    rows = [];
+    if (allowDbFallback) {
+      try {
+        rows = await getRecentCompanyPages(30);
+      } catch {
+        rows = [];
+      }
+    } else {
+      rows = [];
+    }
   }
   const popularStates = ['california', 'new-york', 'texas', 'florida'];
   const stateSeoText: Record<string, string> = {
@@ -198,14 +206,20 @@ export default async function HomePage() {
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, 12).map((r) => (
-              <tr key={r.slug}>
-                <td><a href={companyPathFromSlug(r.slug)}>{r.company_name}</a></td>
-                <td>{r.state}</td>
-                <td>{recordTypeLabel(r.has_osha, r.has_license, r.has_registration)}</td>
-                <td>{r.updated_at ?? '-'}</td>
+            {rows.length > 0 ? (
+              rows.slice(0, 12).map((r) => (
+                <tr key={r.slug}>
+                  <td><a href={companyPathFromSlug(r.slug)}>{r.company_name}</a></td>
+                  <td>{r.state}</td>
+                  <td>{recordTypeLabel(r.has_osha, r.has_license, r.has_registration)}</td>
+                  <td>{r.updated_at ?? '-'}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4}>No recent company records are available in the current dataset.</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </section>
