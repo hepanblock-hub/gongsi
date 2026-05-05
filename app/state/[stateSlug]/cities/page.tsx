@@ -88,12 +88,9 @@ export default async function StateCitiesPage({
         </table>
       </SectionCard>
 
-      <SectionCard title="How to use this city index">
+      <SectionCard title="Related pages">
         <p>
-          Use this page to jump into city-level screening, then open individual company pages for OSHA, license, and registration evidence.
-        </p>
-        <p>
-          Related pages: <a href={`/state/${stateSlug}`}>{stateName} overview</a> · <a href={`/state/${stateSlug}/filter/quality`}>Quality ranking</a> · <a href={`/state/${stateSlug}/filter/active-licenses`}>Active licenses</a>
+          <a href={`/state/${stateSlug}`}>{stateName} overview</a> · <a href={`/state/${stateSlug}/filter/quality`}>Quality ranking</a> · <a href={`/state/${stateSlug}/filter/active-licenses`}>Active licenses</a>
         </p>
       </SectionCard>
     </main>

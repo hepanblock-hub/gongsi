@@ -7,6 +7,7 @@ import JsonLd from '../../../../../components/seo/JsonLd';
 import { type StateCompanyCategoryRow, getCityCompanyPagesWithCategory } from '../../../../../lib/queries';
 import { companyPathFromSlug, SITE_URL, stateSlugToName } from '../../../../../lib/site';
 import { fetchCitySnapshot } from '../../../../../lib/citySnapshot';
+import { assessCollectionPageQuality } from '../../../../../lib/pageQuality';
 
 function shouldAllowCityDbFallback(): boolean {
   const raw = (process.env.CITY_SNAPSHOT_DB_FALLBACK ?? 'false').toLowerCase();
@@ -213,7 +214,8 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   const cityName = targetCitySlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   const citySnapshot = await fetchCitySnapshot(stateSlug, targetCitySlug);
   const allowDbFallback = shouldAllowCityDbFallback();
-  let thinCityCount = citySnapshot?.cityCompanyCount ?? citySnapshot?.companies?.length ?? 0;
+  let cityRows = citySnapshot?.companies ?? [];
+  let thinCityCount = citySnapshot?.cityCompanyCount ?? cityRows.length ?? 0;
 
   // 快照缺失时，metadata 也应与页面主体一致走 DB 兜底，避免“有内容页面却被 noindex”。
   if (!thinCityCount && allowDbFallback) {
@@ -221,13 +223,21 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
       () => getCityCompanyPagesWithCategory(stateSlug, targetCitySlug, 21),
       [] as StateCompanyCategoryRow[]
     );
+    cityRows = dbRows;
     thinCityCount = dbRows.length;
   }
+  const collectionQuality = assessCollectionPageQuality({
+    companyCount: thinCityCount,
+    evidenceCompanyCount: cityRows.filter((row) => row.has_osha || row.has_license || row.has_registration).length,
+    minCompanies: 20,
+    minEvidenceRatio: 0.4,
+    minEvidenceCompanies: 10,
+  });
   return {
     title: { absolute: `${cityName}, ${stateCode} Contractor License Lookup & OSHA Violations` },
     description: `Find ${cityName}, ${stateCode} contractors and companies by OSHA records, license status, and registration signals. Compare risk indicators before hiring.`,
     alternates: { canonical: `/state/${stateSlug}/city/${targetCitySlug}` },
-    robots: { index: thinCityCount >= 20, follow: true },
+    robots: { index: collectionQuality.indexable, follow: true },
     authors: [{ name: 'Compliance Lookup Editorial Team' }],
     creator: 'Compliance Lookup Data Team',
     publisher: 'Compliance Lookup',
@@ -292,7 +302,14 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
   const cityOshaPctNum = Number(oshaPct);
   const cityLicensePctNum = Number(licensePct);
   const cityRegistrationPctNum = Number(registrationPct);
-  const lowCoverage = companies.length < 50 || cityCoveragePctOfState < 1;
+  const collectionQuality = assessCollectionPageQuality({
+    companyCount: companies.length,
+    evidenceCompanyCount: companies.filter((c) => c.has_osha || c.has_license || c.has_registration).length,
+    minCompanies: 20,
+    minEvidenceRatio: 0.4,
+    minEvidenceCompanies: 10,
+  });
+  const lowCoverage = collectionQuality.thin || cityCoveragePctOfState < 1;
 
   const topCompanies = companies.slice(0, 200);
   const decisionStats = topCompanies.reduce(
@@ -370,10 +387,10 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
 
       <PageTitle
         title={`Contractor License Lookup in ${cityName}, ${stateCode} (2026) + OSHA Violations Check`}
-        description={`Tool-style city lookup for "is this company licensed in ${cityName}?" Compare OSHA violations, license signals, and risk tags before hiring.`}
+        description={`City-level snapshot for ${cityName}, ${stateCode}: company counts, OSHA/license/registration coverage, and company record links.`}
       />
 
-      <SectionCard title={`${cityName} company risk answer (quick view)`}>
+      <SectionCard title={`${cityName} data snapshot`}>
         <p>
           In {cityName}, this indexed sample contains <strong>{companies.length}</strong> companies
           (about <strong>{cityCoveragePctOfState.toFixed(1)}%</strong> of current {stateName} indexed sample: {stateBase}).
@@ -382,37 +399,16 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
           and registration-linked profiles appear in <strong>{registrationPct}%</strong>.
         </p>
         <p>
-          Immediate hiring signal: <strong>{activeLicenseCount}</strong> companies show active-license signals,
-          while <strong>{suspendedLicenseCount + expiredLicenseCount}</strong> show suspended/expired signals and
-          <strong> {unknownLicenseCount}</strong> require manual verification.
-          If you are shortlisting vendors in {cityName}, prioritize companies with active-license + registration signals first.
+          License status rows: active <strong>{activeLicenseCount}</strong>, suspended/expired <strong>{suspendedLicenseCount + expiredLicenseCount}</strong>, unknown <strong>{unknownLicenseCount}</strong>.
         </p>
         {lowCoverage && (
           <p>
-            Coverage note: this city view is a decision-support index, not a full legal registry.
-            Use official state systems for complete legal verification.
+            Quality note: this city page stays useful for navigation, but it should not be treated as a high-confidence landing page until more evidence-backed company profiles are available.
           </p>
         )}
       </SectionCard>
 
-      <SectionCard title={`Direct lookup and high-intent shortcuts for ${cityName}`}>
-        <p>
-          Search intent shortcuts: "contractor license {cityName} {stateCode}", "OSHA violations {cityName} companies",
-          and "is [company] licensed in {cityName}".
-        </p>
-        <p>
-          <a href={`/search?state=${encodeURIComponent(stateName)}&city=${encodeURIComponent(cityName)}`}>Search companies in {cityName}</a>
-          {' '}·{' '}
-          <a href={`/state/${stateSlug}/filter/active-licenses`}>View active-license shortlist</a>
-          {' '}·{' '}
-          <a href={`/state/${stateSlug}/filter/osha-violations`}>View OSHA-focused shortlist</a>
-        </p>
-      </SectionCard>
-
-      <SectionCard title={`Company license check shortcuts in ${cityName}`}>
-        <p>
-          One-click checks for the most visible local entities in this dataset:
-        </p>
+      <SectionCard title={`Quick company links in ${cityName}`}>
         <ul>
           {topCompanies.slice(0, 8).map((c) => (
             <li key={`quick-check-${c.slug}`}>
@@ -459,11 +455,8 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
         )}
       </SectionCard>
 
-      <SectionCard title={`${cityName} risk fingerprint (city-unique)`}>
-        <p>{citySpecificContext(targetCitySlug, stateCode)}</p>
+      <SectionCard title={`${cityName} top OSHA-exposed companies`}>
         <p>
-          Top OSHA-exposed companies in this city sample:
-          {' '}
           {topRiskCompanies.length > 0
             ? topRiskCompanies.map((c, idx) => (
               <span key={`risk-${c.slug}`}>
@@ -473,15 +466,9 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
             ))
             : 'No OSHA-heavy entities detected in current sample.'}
         </p>
-        <p>
-          This fingerprint section is city-specific and designed to reduce template repetition by surfacing unique local distribution.
-        </p>
       </SectionCard>
 
-      <SectionCard title={`Top companies to review first in ${cityName}`}>
-        <p>
-          This ranking block is decision-oriented, not a raw dump: start with high-risk review, then compare active-license profiles, then check safer complete profiles.
-        </p>
+      <SectionCard title={`Top companies by record signals in ${cityName}`}>
 
         <h3>High OSHA risk first (top 10)</h3>
         {topHighRiskReview.length > 0 ? (
@@ -511,49 +498,6 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
           <p>No active-license signals in current city sample.</p>
         )}
 
-        <h3>Safer complete profiles (top 10)</h3>
-        {topSaferProfiles.length > 0 ? (
-          <ol>
-            {topSaferProfiles.map((c) => (
-              <li key={`safer-top-${c.slug}`}>
-                <a href={companyPathFromSlug(c.slug)}>{c.company_name}</a>
-                {' '}· {companyTags(c).join(' / ')}
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p>No lower-risk bucket in current city sample.</p>
-        )}
-      </SectionCard>
-
-      <SectionCard title="City-level risk distribution and interpretation">
-        <p>
-          This {cityName} dataset includes <strong>{companies.length}</strong> indexed companies. Active-license signals appear in
-          <strong> {activeLicenseCount}</strong> entities, while suspended or expired signals appear in
-          <strong> {suspendedLicenseCount + expiredLicenseCount}</strong> entities, and
-          <strong> {unknownLicenseCount}</strong> entities have unknown or missing license status in currently available public records.
-        </p>
-        <p>
-          A higher OSHA count does not automatically mean a company is unsafe; it can also reflect business scale,
-          project volume, or inspection intensity in the local industry. For procurement and hiring decisions,
-          the practical approach is to combine OSHA history with current license standing and registration confirmation.
-        </p>
-        <p>
-          In this city view, injury-linked records are present in <strong>{injuryLinkedCount}</strong> companies.
-          Those records should be prioritized for manual due diligence, especially when paired with suspended,
-          revoked, expired, or unknown license signals.
-        </p>
-      </SectionCard>
-
-      <SectionCard title="Data gaps and real-world interpretation">
-        <p>
-          If license coverage appears low in this city, it can mean either (1) source systems publish partial records for this business segment,
-          or (2) matching quality is incomplete for certain local entities. It does not automatically mean every company is unlicensed.
-        </p>
-        <p>
-          Best practice for vendor decisions: combine OSHA history + latest license signal + registration signal, then confirm in official
-          {stateName} systems for final legal standing.
-        </p>
       </SectionCard>
 
       <SectionCard title="Official sources and verification links">
@@ -568,29 +512,8 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
         </p>
       </SectionCard>
 
-      <SectionCard title="Method transparency (scoring logic)">
-        <p>
-          Risk tags are generated from public signals only: OSHA record volume/injury indicators, latest observed license status,
-          and whether registration evidence exists. These tags are prioritization cues, not legal conclusions.
-        </p>
-        <p>
-          Ranking in the table is based on profile completeness and risk-screening utility, then tie-broken by company name.
-        </p>
-      </SectionCard>
-
-      <SectionCard title="Decision support summary (top 200)">
-        <p>
-          Lower review risk: <strong>{decisionStats.lower}</strong> ·
-          Needs manual review: <strong>{decisionStats.manual}</strong> ·
-          Higher review risk: <strong>{decisionStats.higher}</strong>
-        </p>
-        <p>
-          These are screening signals for prioritization only. Always verify final license and legal status through official {stateName} agencies.
-        </p>
-      </SectionCard>
-
       <div id="company-list" />
-      <SectionCard title={`Company list and risk tags in ${cityName}`}>
+      <SectionCard title={`Company list in ${cityName}`}>
         <p>{cityName} · {topCompanies.length} companies shown (from {companies.length} indexed companies)</p>
         <table>
           <thead>
@@ -599,9 +522,8 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
               <th>Profile</th>
               <th>OSHA Records</th>
               <th>License Status</th>
-              <th>Risk Tags</th>
-              <th>Screening Signal</th>
-              <th>Screening Note</th>
+              <th>Registration</th>
+              <th>Injury Count</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -612,9 +534,8 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
                 <td>{categoryOfCompany(c)}</td>
                 <td>{c.osha_count || 0}</td>
                 <td>{c.license_status ?? 'Unknown'}</td>
-                <td>{companyTags(c).join(' · ')}</td>
-                <td>{getDecisionSignal(c)}</td>
-                <td>{getDecisionNote(c, stateName)}</td>
+                <td>{c.has_registration ? 'yes' : 'no'}</td>
+                <td>{c.injury_count ?? 0}</td>
                 <td>
                   <a href={`${companyPathFromSlug(c.slug)}#osha-records`}>OSHA</a> · <a href={`${companyPathFromSlug(c.slug)}#license-records`}>License</a> ·{' '}
                   <a href={`${companyPathFromSlug(c.slug)}#registration-records`}>Registration</a>
@@ -628,24 +549,6 @@ export default async function StateCityPage({ params }: { params: Promise<{ stat
       <SectionCard title={`${cityName} compliance overview`}>
         <p>
           Full profiles (OSHA + License + Registration): {fullCount} · Partial profiles: {partialCount}.
-          This distribution helps identify which companies have enough data for stronger due diligence decisions.
-        </p>
-        <p>
-          For high-value contracts, prioritize companies with active license signals and complete profile coverage,
-          then validate with official state records before final selection.
-        </p>
-      </SectionCard>
-
-      <SectionCard title={`Industry lookup pages for ${cityName}`}>
-        <p>
-          Jump to industry-style lookups for local demand terms:
-          {' '}<a href={`/search?state=${encodeURIComponent(stateName)}&city=${encodeURIComponent(cityName)}&q=roofing`}>roofing companies</a>
-          {' '}·{' '}
-          <a href={`/search?state=${encodeURIComponent(stateName)}&city=${encodeURIComponent(cityName)}&q=electrical`}>electrical contractors</a>
-          {' '}·{' '}
-          <a href={`/search?state=${encodeURIComponent(stateName)}&city=${encodeURIComponent(cityName)}&q=plumbing`}>plumbing contractors</a>
-          {' '}·{' '}
-          <a href={`/search?state=${encodeURIComponent(stateName)}&city=${encodeURIComponent(cityName)}&q=hvac`}>HVAC contractors</a>
         </p>
       </SectionCard>
 

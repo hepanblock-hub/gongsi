@@ -9,6 +9,7 @@ import { canonicalCityPath, canonicalFilterPath } from '../../../lib/indexing';
 import { getStateCityCounts, getStateCompanyPagesWithCategory, getStateSummary, type StateCompanyCategoryRow } from '../../../lib/queries';
 import { companyPathFromSlug, SITE_URL, stateSlugToName } from '../../../lib/site';
 import { fetchStateSnapshot } from '../../../lib/stateSnapshot';
+import { assessCollectionPageQuality } from '../../../lib/pageQuality';
 
 export const revalidate = 86400;
 export const dynamic = 'force-static';
@@ -159,10 +160,15 @@ export async function generateMetadata({ params }: { params: Promise<{ stateSlug
   const { stateSlug } = await params;
   const stateName = stateSlugToName(stateSlug);
   const stateCode = stateCodeOf(stateName);
+  const allowDbFallback = shouldAllowStateDbFallback();
+  const snapshot = await fetchStateSnapshot(stateSlug);
+  const dbSummary = !snapshot && allowDbFallback ? await getStateSummary(stateSlug) : null;
+  const indexable = (snapshot?.summary.company_count ?? dbSummary?.company_count ?? 0) >= 100;
 
   return {
     title: { absolute: `${stateName} Contractor License Lookup & OSHA Violations | Company Compliance` },
     description: `Search ${stateName} (${stateCode}) contractors and companies by OSHA violations, license status, and registration records. Compare profiles before hiring decisions.`,
+    robots: { index: indexable, follow: true },
     alternates: {
       canonical: `/state/${stateSlug}`,
     },
@@ -242,6 +248,13 @@ export default async function StatePage({
   const fullProfilePct = ((categoryCount.full / Math.max(1, analyzedBase)) * 100).toFixed(1);
   const partialProfilePct = ((categoryCount.partial / Math.max(1, analyzedBase)) * 100).toFixed(1);
   const stateCode = stateCodeOf(summary.state);
+  const collectionQuality = assessCollectionPageQuality({
+    companyCount: companiesBySearch.length,
+    evidenceCompanyCount: companiesBySearch.filter((c) => c.has_osha || c.has_license || c.has_registration).length,
+    minCompanies: 100,
+    minEvidenceRatio: 0.45,
+    minEvidenceCompanies: 50,
+  });
 
   const industryCounts = new Map<string, number>();
   for (const c of companiesBySearch) {
@@ -309,18 +322,19 @@ export default async function StatePage({
       <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: summary.state }]} />
       <PageTitle
         title={`Contractor License Lookup in ${summary.state}, ${stateCode} + OSHA Violations Records`}
-        description={`Decision-first state page: prioritize company review order, compare risk tiers, and verify license standing with official ${summary.state} sources.`}
+        description={`State-level snapshot for ${summary.state}: company counts, OSHA records, license records, registration records, and linked source portals.`}
       />
 
-      <SectionCard title={`${summary.state} decision overview (screening first)`}>
-        <p>
-          Primary intent of this page: contractor license lookup + OSHA risk triage for {summary.state}. Start with the review queue,
-          then verify legal standing using official state systems.
-        </p>
+      <SectionCard title={`${summary.state} data snapshot`}>
         <p>
           Coverage in current indexed cycle: <strong>{summary.company_count}</strong> companies, <strong>{summary.osha_count}</strong> OSHA records,
           <strong> {summary.license_count}</strong> license records, <strong>{summary.registration_count}</strong> registration records observed.
         </p>
+        {!collectionQuality.indexable && (
+          <p>
+            Quality note: this state page stays available for navigation, but it should not be treated as a complete statewide index until more evidence-backed profiles are released.
+          </p>
+        )}
       </SectionCard>
 
       <section className="cards">
@@ -338,21 +352,11 @@ export default async function StatePage({
         </SectionCard>
       </section>
 
-      <SectionCard title={`${summary.state} data confidence and gap note`}>
-        <p>Total companies indexed: {summary.company_count}</p>
-        <p>OSHA inspection records: {summary.osha_count}</p>
-        <p>Contractor license records: {summary.license_count > 0 ? 'Observed in current cycle' : 'Not observed in current cycle (verify through official board)'}</p>
-        <p>Business registration records: {summary.registration_count > 0 ? 'Observed in current cycle' : 'Not observed in current cycle (check Secretary of State directly)'}</p>
-        <p>
-          Interpretation: missing records here should be read as “not observed in this ingestion cycle,” not definitive legal absence.
-          Final eligibility decisions require official agency verification.
-        </p>
-      </SectionCard>
-
-      <SectionCard title={`${summary.state} unique insight snapshot`}>
+      <SectionCard title={`${summary.state} evidence snapshot`}>
         <p>
           City concentration signal: top 3 cities contribute <strong>{top3CitySharePct}%</strong> of indexed companies.
-          This helps estimate whether risk is concentrated in a few metros or spread statewide.
+          Evidence-backed profiles account for <strong>{collectionQuality.evidenceCompanyCount}</strong> companies
+          ({(collectionQuality.evidenceRatio * 100).toFixed(1)}% of the current state sample).
         </p>
         <p>
           Industry pattern (name-based signals): {topIndustries.length
@@ -363,11 +367,7 @@ export default async function StatePage({
         </p>
       </SectionCard>
 
-      <SectionCard title={`Top companies to review first in ${summary.state}`}>
-        <p>
-          Ranking logic: (1) injury-linked and suspended/revoked signals first, (2) then active-license + registration profiles.
-          This is designed for decision workflow, not raw alphabetical browsing.
-        </p>
+      <SectionCard title={`Top companies by record signals in ${summary.state}`}>
 
         <h3>High-risk review queue (top 10)</h3>
         {topHighRiskReview.length > 0 ? (
@@ -415,19 +415,6 @@ export default async function StatePage({
         </p>
       </SectionCard>
 
-      <SectionCard title="Browse by category">
-        <p>
-          <a href={`${canonicalFilterPath(stateSlug, 'osha-violations')}#company-list`}>Top companies with OSHA violations in {summary.state}</a> ·{' '}
-          <a href={`${canonicalFilterPath(stateSlug, 'recently-updated')}#company-list`}>Recently inspected companies in {summary.state}</a> ·{' '}
-          <a href={`${canonicalFilterPath(stateSlug, 'active-licenses')}#company-list`}>Contractors with active licenses in {summary.state}</a>
-        </p>
-        <p>
-          <a href={`${canonicalFilterPath(stateSlug, 'full-profiles')}#company-list`}>View all OSHA company records →</a> ·{' '}
-          <a href={`${canonicalFilterPath(stateSlug, 'contractor-licenses')}#company-list`}>View all contractor license records →</a> ·{' '}
-          <a href={`${canonicalFilterPath(stateSlug, 'business-registration')}#company-list`}>View all business registration records →</a>
-        </p>
-      </SectionCard>
-
       <SectionCard title="Company classification">
         <p>Full profile (OSHA + License + Registration): {categoryCount.full}</p>
         <p>Partial profile (any 2 sources): {categoryCount.partial}</p>
@@ -444,20 +431,7 @@ export default async function StatePage({
         </p>
         <p>
           Full profiles represent {fullProfilePct}% of indexed companies, while partial profiles represent {partialProfilePct}%.
-          This helps distinguish companies with broader public-record visibility from entities with limited published records.
-        </p>
-        <p>
-          These metrics are intended for preliminary compliance screening and should be verified against the corresponding official agency records before making legal, hiring, or contracting decisions.
-        </p>
-      </SectionCard>
-
-      <SectionCard title={`${summary.state} evidence fingerprint`}>
-        <p>
-          Indexed companies: <strong>{summary.company_count}</strong> · OSHA-linked: <strong>{categoryCount.full + categoryCount.partial + categoryCount.oshaOnly}</strong> ·
-          License-linked: <strong>{categoryCount.full + categoryCount.partial + categoryCount.licenseOnly}</strong> · Registration-linked: <strong>{categoryCount.full + categoryCount.partial + categoryCount.registrationOnly}</strong>
-        </p>
-        <p>
-          This state page is differentiated by actual source coverage mix, top-city distribution, and company-profile composition rather than city-name substitution alone.
+          This section reports ratio statistics only.
         </p>
       </SectionCard>
 
@@ -522,33 +496,10 @@ export default async function StatePage({
         ))}
       </SectionCard>
 
-      <SectionCard title="Data coverage">
-        <p>This state page includes public OSHA, contractor license, and registration references where available.</p>
-        <p>Update frequency varies by source system and publication cycle.</p>
-      </SectionCard>
-
       <SectionCard title="Sources">
         <p>Source: <a href="https://www.osha.gov/establishment-search" rel="nofollow noopener" target="_blank">OSHA official records</a></p>
         <p>Source: <a href={officialLinks.licenseLookup} rel="nofollow noopener" target="_blank">{officialLinks.licenseAgency}</a></p>
         <p>Source: <a href={officialLinks.registrationLookup} rel="nofollow noopener" target="_blank">{officialLinks.registrationAgency}</a></p>
-      </SectionCard>
-
-      <SectionCard title="Editorial and verification note">
-        <p>
-          Maintained by the Compliance Lookup Editorial Team. This page aggregates official public records for screening and research use.
-        </p>
-        <p>
-          Final legal standing should always be confirmed through official agency systems. Related trust pages: <a href="/sources">Sources</a> · <a href="/methodology">Methodology</a> · <a href="/editorial-policy">Editorial Policy</a>
-        </p>
-      </SectionCard>
-
-      <SectionCard title="FAQ">
-        <p><strong>Do you cover all companies in {summary.state}?</strong><br />Coverage is expanding and depends on available public records from official sources.</p>
-        <p><strong>How often is this {summary.state} compliance data updated?</strong><br />Data is refreshed on periodic cycles based on source availability from OSHA, state licensing boards, and business registration systems.</p>
-        <p><strong>How do I check a contractor license in {summary.state}?</strong><br />Use the search box to enter a company name, then review the contractor license status listed in the results.</p>
-        <p><strong>What does OSHA inspection history mean?</strong><br />OSHA inspections reflect workplace safety reviews conducted by federal authorities. A history of inspections may indicate operational activity or prior safety incidents.</p>
-        <p><strong>Can this data help me make hiring decisions?</strong><br />Yes, this database helps with preliminary compliance screening. However, you should always verify current license and registration status directly with official {summary.state} state agencies.</p>
-        <p><strong>Are these records official?</strong><br />All data is sourced from official public government agencies including OSHA, state contractor licensing boards, and Secretary of State records.</p>
       </SectionCard>
     </main>
   );
